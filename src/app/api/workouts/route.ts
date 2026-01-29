@@ -1,0 +1,107 @@
+/**
+ * @swagger
+ * /api/workouts:
+ *   get:
+ *     summary: Get user workouts
+ *     tags: [Logs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of workouts
+ *   post:
+ *     summary: Log a workout session
+ *     tags: [Logs]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [scheduled_date, exercises]
+ *             properties:
+ *               scheduled_date:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *               status:
+ *                 type: string
+ *                 enum: [PENDING, IN_PROGRESS, COMPLETED, UNFINISHED, MISSED]
+ *               exercises:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     exercise_id:
+ *                       type: integer
+ *                     actual_sets:
+ *                       type: integer
+ *                     actual_reps:
+ *                       type: integer
+ *     responses:
+ *       201:
+ *         description: Workout logged
+ */
+import { NextRequest } from 'next/server';
+import { WorkoutRepository } from '@/repositories/log.repository';
+import { requestWorkoutSchema } from '@/validation/log.schema';
+import { successResponse, errorResponse } from '@/lib/response';
+import { fromZodError } from 'zod-validation-error';
+import { getAuthUser } from '@/lib/auth';
+
+export async function GET(req: NextRequest) {
+  try {
+    const user = getAuthUser(req);
+    if (!user) return errorResponse('Unauthorized', 401);
+
+    const searchParams = req.nextUrl.searchParams;
+    const month = searchParams.get('month') || undefined;
+    const date = searchParams.get('date') || undefined;
+
+    const workouts = await WorkoutRepository.findByUserId(user.userId, { month, date });
+    return successResponse(workouts);
+  } catch (error: any) {
+    return errorResponse(error.message, 500);
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const user = getAuthUser(req);
+    if (!user) return errorResponse('Unauthorized', 401);
+
+    const body = await req.json();
+    const validation = requestWorkoutSchema.safeParse(body);
+    if (!validation.success) {
+      return errorResponse(fromZodError(validation.error).message);
+    }
+
+    const workout = await WorkoutRepository.create(user.userId, validation.data);
+    return successResponse(workout, 'Workout session logged successfully', 201);
+  } catch (error: any) {
+    return errorResponse(error.message, 500);
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    const user = getAuthUser(req);
+    if (!user) return errorResponse('Unauthorized', 401);
+
+    const body = await req.json();
+    const { session_id, ...updateData } = body;
+
+    if (!session_id) {
+      return errorResponse('session_id is required', 400);
+    }
+
+    const result = await WorkoutRepository.updateSession(session_id, user.userId, updateData);
+    return successResponse(result, 'Workout session updated');
+  } catch (error: any) {
+    return errorResponse(error.message, 500);
+  }
+}
