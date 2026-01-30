@@ -34,7 +34,7 @@
  *                   properties:
  *                     food_id:
  *                       type: integer
- *                     amount_grams:
+ *                     numbers_of_serving:
  *                       type: number
  *     responses:
  *       201:

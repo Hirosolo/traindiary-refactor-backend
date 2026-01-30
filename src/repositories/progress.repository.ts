@@ -104,18 +104,21 @@ export const ProgressRepository = {
 
     if (mealError) throw new Error(mealError.message);
 
-    // Calculate current period GR score and muscle split (only from COMPLETED sessions)
+    // Calculate averages based on period days
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+
+    // Calculate total volume and gr_score
     let totalGrScore = 0;
+    let totalVolume = 0;
     const muscleGroups: Record<string, number> = {};
 
     workouts?.forEach(w => {
       if (w.status === 'COMPLETED') {
-        // Use pre-calculated GR score if available
         if (w.gr_score) {
           totalGrScore += w.gr_score;
         }
         
-        // Calculate muscle split from completed sessions only
         w.details?.forEach((d: any) => {
           const category = d.exercise?.category || 'Other';
           const difficulty = d.exercise?.difficulty_factor || 1.0;
@@ -124,7 +127,9 @@ export const ProgressRepository = {
           d.logs?.forEach((l: any) => {
             const reps = l.reps || 0;
             const weight = l.weight_kg || 0;
-            detailForce += reps * weight * difficulty;
+            const volume = reps * weight;
+            totalVolume += volume;
+            detailForce += volume * difficulty;
           });
 
           muscleGroups[category] = (muscleGroups[category] || 0) + detailForce;
@@ -168,16 +173,16 @@ export const ProgressRepository = {
 
     return {
       total_workouts: workouts?.filter((w: any) => w.status === 'COMPLETED').length || 0,
+      total_volume: Math.round(totalVolume),
       gr_score: Math.round(totalGrScore),
       gr_score_change: grScoreChange,
       longest_streak: longestStreak,
       muscle_split: muscleSplit,
-      total_meals: meals?.length || 0,
-      total_calories: Math.round(totalCalories),
-      total_protein: Math.round(totalProtein),
-      total_carbs: Math.round(totalCarbs),
-      total_fat: Math.round(totalFat),
-      total_fiber: Math.round(totalFiber)
+      calories_avg: Math.round(totalCalories / diffDays),
+      protein_avg: Math.round(totalProtein / diffDays),
+      carbs_avg: Math.round(totalCarbs / diffDays),
+      fats_avg: Math.round(totalFat / diffDays),
+      fiber_avg: Math.round(totalFiber / diffDays)
     };
   }
 };
