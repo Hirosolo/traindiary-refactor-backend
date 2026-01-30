@@ -45,7 +45,7 @@ export const MealRepository = {
     const mealDetails = details.map((d: any) => ({
       meal_id: meal.meal_id,
       food_id: d.food_id,
-      amount_grams: d.amount_grams
+      numbers_of_serving: d.amount_grams || d.numbers_of_serving
     }));
 
     const { error: detailsError } = await supabase
@@ -171,6 +171,39 @@ export const WorkoutRepository = {
       if (logError) throw new Error(logError.message);
     }
 
+    // If status is COMPLETED, calculate and update GR score
+    if (status === 'COMPLETED') {
+      const { data: sessionDetails } = await supabase
+        .from('session_details')
+        .select(`
+          session_detail_id,
+          exercise:exercises(difficulty_factor),
+          logs:sessions_exercise_details(reps, weight_kg)
+        `)
+        .eq('session_id', session.session_id);
+
+      let totalGrScore = 0;
+      if (sessionDetails) {
+        sessionDetails.forEach((detail: any) => {
+          const difficulty = detail.exercise?.difficulty_factor || 1.0;
+          detail.logs?.forEach((log: any) => {
+            const reps = log.reps || 0;
+            const weight = log.weight_kg || 0;
+            totalGrScore += reps * weight * difficulty;
+          });
+        });
+      }
+
+      const { data: updatedSession, error: updateError } = await supabase
+        .from('workout_sessions')
+        .update({ gr_score: Math.round(totalGrScore) })
+        .eq('session_id', session.session_id)
+        .select()
+        .single();
+      
+      if (!updateError) return updatedSession;
+    }
+
     return session;
   },
 
@@ -280,6 +313,31 @@ export const WorkoutRepository = {
          updateData.status = sessionData.status;
      } else if (sessionData.completed !== undefined) {
          updateData.status = sessionData.completed ? 'COMPLETED' : 'IN_PROGRESS';
+     }
+
+     // Calculate GR score when status changes to COMPLETED
+     if (updateData.status === 'COMPLETED') {
+       const { data: sessionDetails } = await supabase
+         .from('session_details')
+         .select(`
+           session_detail_id,
+           exercise:exercises(difficulty_factor),
+           logs:sessions_exercise_details(reps, weight_kg)
+         `)
+         .eq('session_id', sessionId);
+
+       let totalGrScore = 0;
+       if (sessionDetails) {
+         sessionDetails.forEach((detail: any) => {
+           const difficulty = detail.exercise?.difficulty_factor || 1.0;
+           detail.logs?.forEach((log: any) => {
+             const reps = log.reps || 0;
+             const weight = log.weight_kg || 0;
+             totalGrScore += reps * weight * difficulty;
+           });
+         });
+       }
+       updateData.gr_score = Math.round(totalGrScore);
      }
 
      const { data, error } = await supabase

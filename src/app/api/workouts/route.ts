@@ -9,6 +9,30 @@
  *     responses:
  *       200:
  *         description: List of workouts
+ *   put:
+ *     summary: Update workout session (using session_id in body)
+ *     tags: [Logs]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [session_id]
+ *             properties:
+ *               session_id:
+ *                 type: integer
+ *               status:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Workout updated
+ *       400:
+ *         description: Missing session_id or invalid JSON
  *   post:
  *     summary: Log a workout session
  *     tags: [Logs]
@@ -92,7 +116,13 @@ export async function PUT(req: NextRequest) {
     const user = getAuthUser(req);
     if (!user) return errorResponse('Unauthorized', 401);
 
-    const body = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return errorResponse('Valid JSON body is required', 400);
+    }
+    
     const { session_id, ...updateData } = body;
 
     if (!session_id) {

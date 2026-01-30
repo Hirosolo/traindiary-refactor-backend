@@ -26,6 +26,22 @@
  *         required: true
  *         schema:
  *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [PENDING, IN_PROGRESS, COMPLETED, UNFINISHED, MISSED]
+ *               notes:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *               scheduled_date:
+ *                 type: string
  *     responses:
  *       200:
  *         description: Session updated
@@ -103,7 +119,12 @@ export async function PUT(
       return errorResponse('Invalid session ID', 400);
     }
 
-    const body = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return errorResponse('Valid JSON body is required', 400);
+    }
     
     const result = await WorkoutRepository.updateSession(sessionId, user.userId, body);
     return successResponse(result, 'Workout session updated');
