@@ -5,10 +5,27 @@ export const MealRepository = {
     let query = supabase
       .from('user_meals')
       .select(`
-        *,
+        meal_id,
+        meal_type,
+        log_date,
         details:user_meal_details(
-          *,
-          food:foods(*)
+          numbers_of_serving,
+          food:foods(
+            calories_per_serving,
+            protein_per_serving,
+            carbs_per_serving,
+            fat_per_serving,
+            fibers_per_serving,
+            sugars_per_serving,
+            zincs_per_serving,
+            magnesiums_per_serving,
+            calciums_per_serving,
+            irons_per_serving,
+            vitamin_a_per_serving,
+            vitamin_c_per_serving,
+            vitamin_b12_per_serving,
+            vitamin_d_per_serving
+          )
         )
       `)
       .eq('user_id', userId)
@@ -26,7 +43,154 @@ export const MealRepository = {
     
     const { data, error } = await query;
     if (error) throw new Error(error.message);
-    return data || [];
+    
+    // Transform data to calculate total nutrition per meal
+    const meals = (data || []).map((meal: any) => {
+      const totals = {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        fibers: 0,
+        sugars: 0,
+        zincs: 0,
+        magnesiums: 0,
+        calciums: 0,
+        irons: 0,
+        vitamin_a: 0,
+        vitamin_c: 0,
+        vitamin_b12: 0,
+        vitamin_d: 0,
+      };
+
+      // Sum up nutrition from all foods in the meal
+      if (meal.details && Array.isArray(meal.details)) {
+        meal.details.forEach((detail: any) => {
+          const servings = detail.numbers_of_serving || 0;
+          const food = detail.food;
+          
+          if (food) {
+            totals.calories += (food.calories_per_serving || 0) * servings;
+            totals.protein += (food.protein_per_serving || 0) * servings;
+            totals.carbs += (food.carbs_per_serving || 0) * servings;
+            totals.fat += (food.fat_per_serving || 0) * servings;
+            totals.fibers += (food.fibers_per_serving || 0) * servings;
+            totals.sugars += (food.sugars_per_serving || 0) * servings;
+            totals.zincs += (food.zincs_per_serving || 0) * servings;
+            totals.magnesiums += (food.magnesiums_per_serving || 0) * servings;
+            totals.calciums += (food.calciums_per_serving || 0) * servings;
+            totals.irons += (food.irons_per_serving || 0) * servings;
+            totals.vitamin_a += (food.vitamin_a_per_serving || 0) * servings;
+            totals.vitamin_c += (food.vitamin_c_per_serving || 0) * servings;
+            totals.vitamin_b12 += (food.vitamin_b12_per_serving || 0) * servings;
+            totals.vitamin_d += (food.vitamin_d_per_serving || 0) * servings;
+          }
+        });
+      }
+
+      // Return meal with aggregated nutrition values
+      return {
+        meal_id: meal.meal_id,
+        meal_type: meal.meal_type,
+        log_date: meal.log_date,
+        total_calories: Math.round(totals.calories * 100) / 100,
+        total_protein: Math.round(totals.protein * 100) / 100,
+        total_carbs: Math.round(totals.carbs * 100) / 100,
+        total_fat: Math.round(totals.fat * 100) / 100,
+        total_fibers: Math.round(totals.fibers * 100) / 100,
+        total_sugars: Math.round(totals.sugars * 100) / 100,
+        total_zincs: Math.round(totals.zincs * 100) / 100,
+        total_magnesiums: Math.round(totals.magnesiums * 100) / 100,
+        total_calciums: Math.round(totals.calciums * 100) / 100,
+        total_irons: Math.round(totals.irons * 100) / 100,
+        total_vitamin_a: Math.round(totals.vitamin_a * 100) / 100,
+        total_vitamin_c: Math.round(totals.vitamin_c * 100) / 100,
+        total_vitamin_b12: Math.round(totals.vitamin_b12 * 100) / 100,
+        total_vitamin_d: Math.round(totals.vitamin_d * 100) / 100,
+      };
+    });
+
+    return meals;
+  },
+
+  async findById(mealId: number, userId: number): Promise<any> {
+    const { data, error } = await supabase
+      .from('user_meals')
+      .select(`
+        meal_id,
+        meal_type,
+        log_date,
+        details:user_meal_details(
+          meal_detail_id,
+          numbers_of_serving,
+          food:foods(
+            food_id,
+            name,
+            serving_type,
+            image,
+            calories_per_serving,
+            protein_per_serving,
+            carbs_per_serving,
+            fat_per_serving,
+            fibers_per_serving,
+            sugars_per_serving,
+            zincs_per_serving,
+            magnesiums_per_serving,
+            calciums_per_serving,
+            irons_per_serving,
+            vitamin_a_per_serving,
+            vitamin_c_per_serving,
+            vitamin_b12_per_serving,
+            vitamin_d_per_serving
+          )
+        )
+      `)
+      .eq('meal_id', mealId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        throw new Error('Meal not found');
+      }
+      throw new Error(error.message);
+    }
+
+    // Transform to calculate total nutrition per food
+    const foods = (data.details || []).map((detail: any) => {
+      const servings = detail.numbers_of_serving || 0;
+      const food = detail.food;
+      
+      return {
+        meal_detail_id: detail.meal_detail_id,
+        food_id: food?.food_id,
+        food_name: food?.name,
+        serving_type: food?.serving_type,
+        image: food?.image,
+        numbers_of_serving: servings,
+        total_calories: Math.round((food?.calories_per_serving || 0) * servings * 100) / 100,
+        total_protein: Math.round((food?.protein_per_serving || 0) * servings * 100) / 100,
+        total_carbs: Math.round((food?.carbs_per_serving || 0) * servings * 100) / 100,
+        total_fat: Math.round((food?.fat_per_serving || 0) * servings * 100) / 100,
+        total_fibers: Math.round((food?.fibers_per_serving || 0) * servings * 100) / 100,
+        total_sugars: Math.round((food?.sugars_per_serving || 0) * servings * 100) / 100,
+        total_zincs: Math.round((food?.zincs_per_serving || 0) * servings * 100) / 100,
+        total_magnesiums: Math.round((food?.magnesiums_per_serving || 0) * servings * 100) / 100,
+        total_calciums: Math.round((food?.calciums_per_serving || 0) * servings * 100) / 100,
+        total_irons: Math.round((food?.irons_per_serving || 0) * servings * 100) / 100,
+        total_vitamin_a: Math.round((food?.vitamin_a_per_serving || 0) * servings * 100) / 100,
+        total_vitamin_c: Math.round((food?.vitamin_c_per_serving || 0) * servings * 100) / 100,
+        total_vitamin_b12: Math.round((food?.vitamin_b12_per_serving || 0) * servings * 100) / 100,
+        total_vitamin_d: Math.round((food?.vitamin_d_per_serving || 0) * servings * 100) / 100,
+      };
+    });
+
+    return {
+      meal_id: data.meal_id,
+      meal_type: data.meal_type,
+      log_date: data.log_date,
+      foods,
+    };
   },
 
   async create(userId: number, mealData: any): Promise<any> {

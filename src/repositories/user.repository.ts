@@ -9,8 +9,8 @@ const handleResult = (result: any) => {
 export interface User {
   user_id: number;
   email: string;
-  password_hash: string;
-  created_at?: string;
+  username: string;
+  phone_number: string;
 }
 
 export const UserRepository = {

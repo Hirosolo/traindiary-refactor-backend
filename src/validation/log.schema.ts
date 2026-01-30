@@ -10,7 +10,7 @@ export const mealDetailSchema = z.object({
 });
 
 export const requestMealSchema = z.object({
-  meal_type: z.enum(['breakfast', 'lunch', 'dinner', 'snack']),
+  meal_type: z.enum(['breakfast', 'lunch', 'dinner', 'snack', 'pre-workout', 'post-workout']),
   log_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
   details: z.array(mealDetailSchema).min(1, 'At least one food detail is required'),
 });

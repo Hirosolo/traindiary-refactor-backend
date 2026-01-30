@@ -2,13 +2,72 @@
  * @swagger
  * /api/meals:
  *   get:
- *     summary: Get user meals
+ *     summary: Get user meals with total nutrition
  *     tags: [Logs]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: month
+ *         schema:
+ *           type: string
+ *         description: Filter by month (YYYY-MM format)
+ *       - in: query
+ *         name: date
+ *         schema:
+ *           type: string
+ *         description: Filter by specific date (YYYY-MM-DD format)
  *     responses:
  *       200:
- *         description: List of meals
+ *         description: List of meals with aggregated nutrition totals
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       meal_id:
+ *                         type: integer
+ *                       meal_type:
+ *                         type: string
+                         enum: [breakfast, lunch, dinner, snack, pre-workout, post-workout]
+ *                       log_date:
+ *                         type: string
+ *                         format: date
+ *                       total_calories:
+ *                         type: number
+ *                       total_protein:
+ *                         type: number
+ *                       total_carbs:
+ *                         type: number
+ *                       total_fat:
+ *                         type: number
+ *                       total_fibers:
+ *                         type: number
+ *                       total_sugars:
+ *                         type: number
+ *                       total_zincs:
+ *                         type: number
+ *                       total_magnesiums:
+ *                         type: number
+ *                       total_calciums:
+ *                         type: number
+ *                       total_irons:
+ *                         type: number
+ *                       total_vitamin_a:
+ *                         type: number
+ *                       total_vitamin_c:
+ *                         type: number
+ *                       total_vitamin_b12:
+ *                         type: number
+ *                       total_vitamin_d:
+ *                         type: number
  *   post:
  *     summary: Log a meal
  *     tags: [Logs]
@@ -24,7 +83,7 @@
  *             properties:
  *               meal_type:
  *                 type: string
- *                 enum: [breakfast, lunch, dinner, snack]
+ *                 enum: [breakfast, lunch, dinner, snack, pre-workout, post-workout]
  *               log_date:
  *                 type: string
  *               details:

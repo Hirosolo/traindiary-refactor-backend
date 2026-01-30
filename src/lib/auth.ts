@@ -7,7 +7,7 @@ export interface AuthenticatedUser {
 }
 
 export const getAuthUser = (req: NextRequest): AuthenticatedUser | null => {
-  const authHeader = req.headers.get('authorization');
+  const authHeader = req.headers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    .get('authorization');
   
   if (!authHeader) {
      console.log('[AUTH] Missing Authorization header');
