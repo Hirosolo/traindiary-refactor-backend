@@ -11,6 +11,7 @@ export function middleware(request: NextRequest) {
     'http://localhost:3001',
     'http://localhost:5173',
     'http://localhost:4200',
+    'https://traindiary-new-frontend.vercel.app',
   ];
 
   // Check if the origin is allowed
