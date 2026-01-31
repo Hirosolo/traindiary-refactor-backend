@@ -36,7 +36,7 @@
  *                         type: integer
  *                       meal_type:
  *                         type: string
-                         enum: [breakfast, lunch, dinner, snack, pre-workout, post-workout]
+ *                         enum: [breakfast, lunch, dinner, snack, pre-workout, post-workout]
  *                       log_date:
  *                         type: string
  *                         format: date
