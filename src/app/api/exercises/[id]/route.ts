@@ -5,9 +5,13 @@ import { successResponse, errorResponse } from '@/lib/response';
 import { fromZodError } from 'zod-validation-error';
 import { getAuthUser } from '@/lib/auth';
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const exerciseId = parseInt(params.id);
+    const { id } = await params;
+    const exerciseId = parseInt(id);
     const exercise = await ExerciseRepository.findById(exerciseId);
     if (!exercise) return errorResponse('Exercise not found', 404);
     return successResponse(exercise);
@@ -16,12 +20,16 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = getAuthUser(req);
     if (!user) return errorResponse('Unauthorized', 401);
 
-    const exerciseId = parseInt(params.id);
+    const { id } = await params;
+    const exerciseId = parseInt(id);
     const body = await req.json();
     const validation = exerciseSchema.safeParse(body);
     if (!validation.success) {
@@ -36,12 +44,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const user = getAuthUser(req);
     if (!user) return errorResponse('Unauthorized', 401);
 
-    const exerciseId = parseInt(params.id);
+    const { id } = await params;
+    const exerciseId = parseInt(id);
     const deleted = await ExerciseRepository.delete(exerciseId);
     if (!deleted) return errorResponse('Exercise not found', 404);
     return successResponse(null, 'Exercise deleted successfully');
