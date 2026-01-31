@@ -5,9 +5,10 @@ import { successResponse, errorResponse } from '@/lib/response';
 import { fromZodError } from 'zod-validation-error';
 import { getAuthUser } from '@/lib/auth';
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const foodId = parseInt(params.id);
+    const { id } = await params;
+    const foodId = parseInt(id);
     const food = await FoodRepository.findById(foodId);
     if (!food) return errorResponse('Food not found', 404);
     return successResponse(food);
@@ -16,12 +17,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = getAuthUser(req);
     if (!user) return errorResponse('Unauthorized', 401);
 
-    const foodId = parseInt(params.id);
+    const { id } = await params;
+    const foodId = parseInt(id);
     const body = await req.json();
     const validation = foodSchema.safeParse(body);
     if (!validation.success) {
@@ -36,12 +38,13 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = getAuthUser(req);
     if (!user) return errorResponse('Unauthorized', 401);
 
-    const foodId = parseInt(params.id);
+    const { id } = await params;
+    const foodId = parseInt(id);
     const deleted = await FoodRepository.delete(foodId);
     if (!deleted) return errorResponse('Food not found', 404);
     return successResponse(null, 'Food deleted successfully');
