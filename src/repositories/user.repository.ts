@@ -11,6 +11,7 @@ export interface User {
   email: string;
   username: string;
   phone_number: string;
+  password_hash: string;
 }
 
 export const UserRepository = {
