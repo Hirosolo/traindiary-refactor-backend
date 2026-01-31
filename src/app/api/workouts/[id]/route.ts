@@ -67,13 +67,14 @@ import { getAuthUser } from '@/lib/auth';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = getAuthUser(req);
     if (!user) return errorResponse('Unauthorized', 401);
 
-    const sessionId = parseInt(params.id);
+    const { id } = await params;
+    const sessionId = parseInt(id);
     if (isNaN(sessionId)) {
       return errorResponse('Invalid session ID', 400);
     }
@@ -108,13 +109,14 @@ export async function GET(
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = getAuthUser(req);
     if (!user) return errorResponse('Unauthorized', 401);
 
-    const sessionId = parseInt(params.id);
+    const { id } = await params;
+    const sessionId = parseInt(id);
     if (isNaN(sessionId)) {
       return errorResponse('Invalid session ID', 400);
     }
@@ -135,13 +137,14 @@ export async function PUT(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = getAuthUser(req);
     if (!user) return errorResponse('Unauthorized', 401);
 
-    const sessionId = parseInt(params.id);
+    const { id } = await params;
+    const sessionId = parseInt(id);
     if (isNaN(sessionId)) {
       return errorResponse('Invalid session ID', 400);
     }

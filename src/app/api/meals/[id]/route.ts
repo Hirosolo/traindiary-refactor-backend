@@ -102,13 +102,14 @@ import { getAuthUser } from '@/lib/auth';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = getAuthUser(req);
     if (!user) return errorResponse('Unauthorized', 401);
 
-    const mealId = parseInt(params.id);
+    const { id } = await params;
+    const mealId = parseInt(id);
     if (isNaN(mealId)) {
       return errorResponse('Invalid meal ID', 400);
     }
@@ -125,13 +126,14 @@ export async function GET(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = getAuthUser(req);
     if (!user) return errorResponse('Unauthorized', 401);
 
-    const mealId = parseInt(params.id);
+    const { id } = await params;
+    const mealId = parseInt(id);
     if (isNaN(mealId)) {
       return errorResponse('Invalid meal ID', 400);
     }
