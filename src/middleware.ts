@@ -25,9 +25,11 @@ export function middleware(request: NextRequest) {
       response.headers.set('Access-Control-Allow-Origin', origin || '*');
     }
     
-    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
     response.headers.set('Access-Control-Max-Age', '86400');
+    response.headers.set('Access-Control-Allow-Credentials', 'true');
+    response.headers.set('Vary', 'Origin');
     
     return response;
   }
@@ -39,8 +41,10 @@ export function middleware(request: NextRequest) {
     response.headers.set('Access-Control-Allow-Origin', origin || '*');
   }
   
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  response.headers.set('Access-Control-Allow-Credentials', 'true');
+  response.headers.set('Vary', 'Origin');
 
   return response;
 }
