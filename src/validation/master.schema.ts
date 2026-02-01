@@ -18,6 +18,8 @@ export const exerciseSchema = z.object({
   default_sets: z.number().int().min(0).optional().nullable(),
   default_reps: z.number().int().min(0).optional().nullable(),
   description: z.string().optional().nullable(),
+  difficulty_factor: z.number().optional().nullable(),
+  type: z.enum(['strength', 'cardio', 'flexibility', 'balance']).optional().default('strength'),
 });
 
 export type ExerciseInput = z.infer<typeof exerciseSchema>;
