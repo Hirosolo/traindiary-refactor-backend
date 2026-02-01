@@ -85,7 +85,7 @@
  *       401:
  *         description: Unauthorized
  *   post:
- *     summary: Log a meal
+ *     summary: create a meal
  *     tags: [Meals]
  *     security:
  *       - bearerAuth: []

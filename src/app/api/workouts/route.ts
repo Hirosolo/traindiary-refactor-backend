@@ -93,7 +93,7 @@
  *                   type: array
  *                   example: []
  *   post:
- *     summary: Log a workout session
+ *     summary: Create a workout session
  *     description: Create a new workout session with exercises. Only one workout session is allowed per day.
  *     tags: [Workout sessions]
  *     security:
@@ -108,7 +108,7 @@
  *             properties:
  *               userId:
  *                 type: integer
- *                 description: Optional user ID to log workout for (if not provided, uses authenticated user)
+ *                 description: Optional user ID to create workout for (if not provided, uses authenticated user)
  *                 example: 14
  *               scheduled_date:
  *                 type: string
