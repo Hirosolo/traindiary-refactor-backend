@@ -46,6 +46,8 @@ export const AuthService = {
 
     await sendVerificationEmail(user.email, verificationCode, verifyLink);
 
+    const token = signToken({ userId: user.user_id, email: user.email });
+
     return {
       user: {
         id: user.user_id,
@@ -53,6 +55,8 @@ export const AuthService = {
         fullname: user.username,
         phone: user.phone_number,
       },
+      verificationCode,
+      token,
       verificationRequired: true,
     };
   },

@@ -19,9 +19,81 @@
  *                 type: string
  *     responses:
  *       200:
- *         description: Email verified
+ *         description: Email verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Email verified successfully
+ *                 data:
+ *                   nullable: true
+ *                   example: null
  *       400:
- *         description: Verification failed
+ *         description: Verification failed - invalid code/token or expired
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Invalid verification code or token
+ *                 errors:
+ *                   nullable: true
+ *                   example: null
+ *   get:
+ *     summary: Verify email with token via URL
+ *     description: Verify a user's email using a token passed as a query parameter.
+ *     tags: [Auth]
+ *     parameters:
+ *       - in: query
+ *         name: token
+ *         schema:
+ *           type: string
+ *         required: true
+ *         example: abc123def456...
+ *     responses:
+ *       200:
+ *         description: Email verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Email verified successfully
+ *                 data:
+ *                   nullable: true
+ *                   example: null
+ *       400:
+ *         description: Verification failed - invalid or expired token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Invalid verification token
+ *                 errors:
+ *                   nullable: true
+ *                   example: null
  */
 import { NextRequest } from 'next/server';
 import { UserRepository } from '@/repositories/user.repository';
