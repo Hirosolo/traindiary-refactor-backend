@@ -1,4 +1,5 @@
 import swaggerJSDoc from 'swagger-jsdoc';
+import path from 'path';
 
 const BACKEND_URL = process.env.SERVER_URL || 'http://localhost:3001';
 
@@ -26,8 +27,10 @@ const options = {
       },
     },
   },
-  // Path to the API docs
-  apis: ['./src/app/api/**/*.ts', './src/lib/swagger-docs.ts'], // Target all API routes
+  // Path to the API docs - use absolute paths for Vercel compatibility
+  apis: [
+    path.join(process.cwd(), 'src/app/api/**/*.ts'),
+  ],
 };
 
 export const swaggerSpec = swaggerJSDoc(options);
