@@ -3,7 +3,7 @@
  * /api/exercises:
  *   get:
  *     summary: Get all exercises or search exercises by name
- *     tags: [Master Data]
+ *     tags: [Exercises]
  *     parameters:
  *       - in: query
  *         name: name
@@ -71,7 +71,7 @@
  *                   example: []
  *   post:
  *     summary: Create new exercise
- *     tags: [Master Data]
+ *     tags: [Exercises]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -166,7 +166,7 @@ export async function GET(req: NextRequest) {
     if (name) {
       exercises = await ExerciseRepository.findByName(name);
       if (!exercises || exercises.length === 0) {
-        return errorResponse('not found exercise with those keyword', 404);
+        return errorResponse('Fot found exercise with those keyword', 404);
       }
     } else {
       exercises = await ExerciseRepository.findAll();

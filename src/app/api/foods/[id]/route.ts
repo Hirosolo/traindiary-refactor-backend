@@ -185,8 +185,10 @@
  *         description: Food not found
  *       401:
  *         description: Unauthorized
+ *       417:
+ *         description: Faild to delete food
  *       400:
- *         description: Validation error
+ *         description: Wrong format
  *   delete:
  *     summary: Delete a food by ID
  *     tags: [Foods]
@@ -220,6 +222,8 @@
  *         description: Food not found
  *       401:
  *         description: Unauthorized
+ *       417:
+ *         description: Faild to delete food
  */
 import { NextRequest } from "next/server";
 import { FoodRepository } from "@/repositories/master.repository";

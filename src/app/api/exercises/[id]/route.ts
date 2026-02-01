@@ -3,7 +3,7 @@
  * /api/exercises/{id}:
  *   get:
  *     summary: Get an exercise by ID
- *     tags: [Master Data]
+ *     tags: [Exercises]
  *     parameters:
  *       - in: path
  *         name: id
@@ -67,7 +67,7 @@
  *                   example: Exercise not found
  *   put:
  *     summary: Update an exercise by ID
- *     tags: [Master Data]
+ *     tags: [Exercises]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -124,11 +124,13 @@
  *         description: Exercise not found
  *       401:
  *         description: Unauthorized
+ *       417:
+ *         description: Faild to delete exercise
  *       400:
- *         description: Validation error
+ *         description: Wrong format
  *   delete:
  *     summary: Delete an exercise by ID
- *     tags: [Master Data]
+ *     tags: [Exercises]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -159,6 +161,10 @@
  *         description: Exercise not found
  *       401:
  *         description: Unauthorized
+ *       417:
+ *         description: Faild to delete exercise
+ *       400:
+ *         description: Wrong format
  */
 import { NextRequest } from 'next/server';
 import { ExerciseRepository } from '@/repositories/master.repository';
