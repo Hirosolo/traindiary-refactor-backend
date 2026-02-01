@@ -32,8 +32,21 @@
  *                   type: string
  *                   example: Email verified successfully
  *                 data:
- *                   nullable: true
- *                   example: null
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                           example: 14
+ *                         email:
+ *                           type: string
+ *                           example: user1@gmail.com
+ *                     token:
+ *                       type: string
+ *                       description: JWT access token
+ *                       example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
  *       400:
  *         description: Verification failed - invalid code/token or expired
  *         content:
@@ -76,8 +89,21 @@
  *                   type: string
  *                   example: Email verified successfully
  *                 data:
- *                   nullable: true
- *                   example: null
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                           example: 14
+ *                         email:
+ *                           type: string
+ *                           example: user1@gmail.com
+ *                     token:
+ *                       type: string
+ *                       description: JWT access token
+ *                       example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
  *       400:
  *         description: Verification failed - invalid or expired token
  *         content:
@@ -100,6 +126,7 @@ import { UserRepository } from '@/repositories/user.repository';
 import { verifyEmailSchema } from '@/validation/auth.schema';
 import { successResponse, errorResponse } from '@/lib/response';
 import { fromZodError } from 'zod-validation-error';
+import { signToken } from '@/lib/jwt';
 
 export async function POST(req: NextRequest) {
   try {
@@ -111,10 +138,10 @@ export async function POST(req: NextRequest) {
       return errorResponse(errorMessage, 400);
     }
 
-    const { code, token } = validation.data;
+    const { code, token: verificationTokenParam } = validation.data;
 
-    const user = token
-      ? await UserRepository.findByVerificationToken(token)
+    const user = verificationTokenParam
+      ? await UserRepository.findByVerificationToken(verificationTokenParam)
       : code
         ? await UserRepository.findByVerificationCode(code)
         : null;
@@ -133,7 +160,18 @@ export async function POST(req: NextRequest) {
     }
 
     await UserRepository.verifyUser(user.user_id);
-    return successResponse(null, 'Email verified successfully', 200);
+    const token = signToken({ userId: user.user_id, email: user.email });
+    return successResponse(
+      {
+        user: {
+          id: user.user_id,
+          email: user.email,
+        },
+        token,
+      },
+      'Email verified successfully',
+      200
+    );
   } catch (error: any) {
     return errorResponse(error.message || 'Internal Server Error', 500);
   }
@@ -141,12 +179,12 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const token = req.nextUrl.searchParams.get('token');
-    if (!token) {
+    const verificationToken = req.nextUrl.searchParams.get('token');
+    if (!verificationToken) {
       return errorResponse('Missing verification token', 400);
     }
 
-    const user = await UserRepository.findByVerificationToken(token);
+    const user = await UserRepository.findByVerificationToken(verificationToken);
     if (!user) {
       return errorResponse('Invalid verification token', 400);
     }
@@ -160,12 +198,23 @@ export async function GET(req: NextRequest) {
       return errorResponse('Verification expired. Please sign up again.', 400);
     }
 
-    if (user.verification_token !== token) {
+    if (user.verification_token !== verificationToken) {
       return errorResponse('Invalid verification token', 400);
     }
 
     await UserRepository.verifyUser(user.user_id);
-    return successResponse(null, 'Email verified successfully', 200);
+    const token = signToken({ userId: user.user_id, email: user.email });
+    return successResponse(
+      {
+        user: {
+          id: user.user_id,
+          email: user.email,
+        },
+        token,
+      },
+      'Email verified successfully',
+      200
+    );
   } catch (error: any) {
     return errorResponse(error.message || 'Internal Server Error', 500);
   }
