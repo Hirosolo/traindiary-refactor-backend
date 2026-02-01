@@ -3,6 +3,7 @@
  * /api/auth/verify:
  *   post:
  *     summary: Verify email with code or token
+ *     description: Verify a user's email using either a verification code or token.
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -11,10 +12,9 @@
  *           schema:
  *             type: object
  *             properties:
- *               email:
- *                 type: string
  *               code:
  *                 type: string
+ *                 example: "123456"
  *               token:
  *                 type: string
  *     responses:

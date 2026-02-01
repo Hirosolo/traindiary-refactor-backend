@@ -15,14 +15,58 @@
  *             properties:
  *               email:
  *                 type: string
+ *                 example: user1@gmail.com
  *               password:
  *                 type: string
+ *                 example: password123
  *     responses:
  *       200:
  *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Login successful
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: integer
+ *                           example: 1
+ *                         email:
+ *                           type: string
+ *                           example: user1@gmail.com
+ *                     token:
+ *                       type: string
+ *                       description: JWT access token
+ *                       example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
  *       400:
- *         description: Invalid credentials
+ *         description: Invalid email or password
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: Invalid email or password
+ *                 errors:
+ *                   nullable: true
+ *                   example: null
  */
+
 import { NextRequest } from 'next/server';
 import { AuthService } from '@/services/auth.service';
 import { loginSchema } from '@/validation/auth.schema';
