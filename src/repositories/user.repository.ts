@@ -72,6 +72,17 @@ export const UserRepository = {
     return data || null;
   },
 
+  async findByVerificationCode(code: string): Promise<User | null> {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('verification_code', code)
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw new Error(error.message);
+    return data || null;
+  },
+
   async verifyUser(userId: number): Promise<void> {
     const { error } = await supabase
       .from('users')

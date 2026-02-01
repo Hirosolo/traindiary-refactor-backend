@@ -15,7 +15,18 @@ export const AuthService = {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(input.password, salt);
 
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate unique verification code
+    let verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    let isUnique = false;
+    while (!isUnique) {
+      const existingUser = await UserRepository.findByVerificationCode(verificationCode);
+      if (!existingUser) {
+        isUnique = true;
+      } else {
+        verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      }
+    }
+
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const verificationExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 

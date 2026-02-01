@@ -39,16 +39,16 @@ export async function POST(req: NextRequest) {
       return errorResponse(errorMessage, 400);
     }
 
-    const { email, code, token } = validation.data;
+    const { code, token } = validation.data;
 
     const user = token
       ? await UserRepository.findByVerificationToken(token)
-      : email
-        ? await UserRepository.findByEmail(email)
+      : code
+        ? await UserRepository.findByVerificationCode(code)
         : null;
 
     if (!user) {
-      return errorResponse('Invalid verification details', 400);
+      return errorResponse('Invalid verification code or token', 400);
     }
 
     if (user.verified) {
@@ -58,18 +58,6 @@ export async function POST(req: NextRequest) {
     if (!user.verification_expires_at || new Date(user.verification_expires_at) < new Date()) {
       await UserRepository.deleteById(user.user_id);
       return errorResponse('Verification expired. Please sign up again.', 400);
-    }
-
-    if (token) {
-      if (user.verification_token !== token) {
-        return errorResponse('Invalid verification token', 400);
-      }
-    } else if (email && code) {
-      if (user.verification_code !== code) {
-        return errorResponse('Invalid verification code', 400);
-      }
-    } else {
-      return errorResponse('Invalid verification details', 400);
     }
 
     await UserRepository.verifyUser(user.user_id);

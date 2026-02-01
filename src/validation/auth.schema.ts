@@ -13,11 +13,10 @@ export const loginSchema = z.object({
 });
 
 export const verifyEmailSchema = z.object({
-  email: z.string().email('Invalid email address').optional(),
   code: z.string().length(6, 'Verification code must be 6 digits').optional(),
   token: z.string().min(10, 'Invalid verification token').optional(),
-}).refine((data) => (data.email && data.code) || data.token, {
-  message: 'Provide email and code, or token',
+}).refine((data) => data.code || data.token, {
+  message: 'Provide verification code or token',
 });
 
 export type SignupInput = z.infer<typeof signupSchema>;
