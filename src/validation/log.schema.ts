@@ -20,9 +20,10 @@ export type RequestMealInput = z.infer<typeof requestMealSchema>;
 export const exerciseLogSchema = z.object({
   exercise_id: z.number().int(),
   actual_sets: z.number().int().min(1),
-  actual_reps: z.number().int().min(1),
+  actual_reps: z.number().int().min(0).optional(),
   weight_kg: z.number().optional().nullable(),
-  duration_seconds: z.number().int().optional().nullable(),
+  duration: z.number().int().min(0).optional().nullable(),
+  duration_seconds: z.number().int().min(0).optional().nullable(),
   notes: z.string().optional().nullable(),
 });
 

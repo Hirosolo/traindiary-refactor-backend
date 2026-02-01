@@ -1,5 +1,57 @@
 import { supabase } from '@/lib/supabase';
 
+const normalizeExerciseType = (type?: string | null) => (type || '').toLowerCase();
+
+const buildExerciseTypeMap = async (exerciseIds: number[]) => {
+  if (exerciseIds.length === 0) return new Map<number, string>();
+  const { data, error } = await supabase
+    .from('exercises')
+    .select('exercise_id, type')
+    .in('exercise_id', exerciseIds);
+
+  if (error) throw new Error(error.message);
+
+  const map = new Map<number, string>();
+  (data || []).forEach((row: any) => {
+    map.set(row.exercise_id, row.type);
+  });
+  return map;
+};
+
+const isCardioBySessionDetailId = async (sessionDetailId: number): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('session_details')
+    .select('exercise_id, session_id')
+    .eq('session_detail_id', sessionDetailId)
+    .single();
+
+  if (error) throw new Error(error.message);
+  
+  const exerciseId = data?.exercise_id;
+  if (!exerciseId) return false;
+  
+  const { data: exercise, error: exError } = await supabase
+    .from('exercises')
+    .select('type')
+    .eq('exercise_id', exerciseId)
+    .single();
+  
+  if (exError) throw new Error(exError.message);
+  return normalizeExerciseType(exercise?.type as string | undefined) === 'cardio';
+};
+
+const isCardioByLogId = async (logId: number): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('sessions_exercise_details')
+    .select('session_detail_id')
+    .eq('set_id', logId)
+    .single();
+
+  if (error) throw new Error(error.message);
+  
+  return isCardioBySessionDetailId(data?.session_detail_id as number);
+};
+
 export const MealRepository = {
   async findByUserId(userId: number, filters: { month?: string, date?: string } = {}): Promise<any[]> {
     let query = supabase
@@ -332,6 +384,8 @@ export const WorkoutRepository = {
       exerciseMap.get(exerciseId)!.push(...sets);
     }
 
+    const exerciseTypeMap = await buildExerciseTypeMap(Array.from(exerciseMap.keys()));
+
     // Now create ONE session_detail per unique exercise
     for (const [exerciseId, allSets] of exerciseMap.entries()) {
       const { data: detail, error: detailError } = await supabase
@@ -347,13 +401,18 @@ export const WorkoutRepository = {
       if (detailError) throw new Error(detailError.message);
 
       // Create all sets for this exercise
-      const logInserts = allSets.map((s: any) => ({
+      const isCardio = normalizeExerciseType(exerciseTypeMap.get(exerciseId)) === 'cardio';
+      const logInserts = allSets.map((s: any) => {
+        const durationMinutes = s.duration ?? (s.duration_seconds ? Math.round(s.duration_seconds / 60) : 0);
+        return {
           session_detail_id: detail.session_detail_id,
-          reps: s.actual_reps || s.reps || 0,
-          weight_kg: s.weight_kg || s.weight || 0,
+          reps: isCardio ? 0 : (s.actual_reps || s.reps || 0),
+          duration: isCardio ? durationMinutes : 0,
+          weight_kg: isCardio ? 0 : (s.weight_kg || s.weight || 0),
           status: s.status ? 'COMPLETED' : 'UNFINISHED',
           notes: s.notes || null
-      }));
+        };
+      });
 
       const { error: logError } = await supabase
         .from('sessions_exercise_details')
@@ -400,11 +459,16 @@ export const WorkoutRepository = {
 
   async updateLog(logId: number, logData: any): Promise<any> {
     const updateData: any = {};
-    
-    if (logData.actual_reps !== undefined || logData.reps !== undefined) {
+    const isCardio = await isCardioByLogId(logId);
+
+    if (!isCardio && (logData.actual_reps !== undefined || logData.reps !== undefined)) {
       updateData.reps = logData.actual_reps ?? logData.reps;
     }
-    if (logData.weight_kg !== undefined) {
+    if (isCardio && (logData.duration !== undefined || logData.actual_duration !== undefined || logData.duration_seconds !== undefined)) {
+      const durationMinutes = logData.duration ?? logData.actual_duration ?? (logData.duration_seconds ? Math.round(logData.duration_seconds / 60) : undefined);
+      if (durationMinutes !== undefined) updateData.duration = durationMinutes;
+    }
+    if (!isCardio && logData.weight_kg !== undefined) {
       updateData.weight_kg = logData.weight_kg;
     }
     if (logData.notes !== undefined) {
@@ -431,6 +495,7 @@ export const WorkoutRepository = {
   },
 
   async createLog(sessionDetailId: number, logData: any): Promise<any> {
+    const isCardio = await isCardioBySessionDetailId(sessionDetailId);
     // Ensure required fields have defaults
     let status = 'UNFINISHED';
     if (logData.status !== undefined) {
@@ -441,10 +506,12 @@ export const WorkoutRepository = {
         }
     }
 
+    const durationMinutes = logData.duration ?? logData.actual_duration ?? (logData.duration_seconds ? Math.round(logData.duration_seconds / 60) : 0);
     const insertData = {
       session_detail_id: sessionDetailId,
-      reps: logData.actual_reps || logData.reps || 0,
-      weight_kg: logData.weight_kg || 0,
+      reps: isCardio ? 0 : (logData.actual_reps || logData.reps || 0),
+      duration: isCardio ? durationMinutes : 0,
+      weight_kg: isCardio ? 0 : (logData.weight_kg || 0),
       status: status,
       notes: logData.notes || null
     };

@@ -1,14 +1,22 @@
 /**
  * @swagger
+ * tags:
+ *   name: Session details
+ *   description: Session's exercise management
+ */
+
+/**
+ * @swagger
  * /api/workouts/{id}:
  *   get:
- *     summary: Get workout session details
- *     tags: [Logs]
+ *     summary: Get all exercise exist in session with it's rep information
+ *     tags: [Session details]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
+ *         description: session_id
  *         required: true
  *         schema:
  *           type: integer
@@ -16,13 +24,14 @@
  *       200:
  *         description: Workout session details
  *   put:
- *     summary: Update workout session
- *     tags: [Logs]
+ *     summary: Update session details (exercise in session)
+ *     tags: [Session details]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
+ *         description: session_id
  *         required: true
  *         schema:
  *           type: integer
@@ -47,12 +56,13 @@
  *         description: Session updated
  *   delete:
  *     summary: Delete workout session
- *     tags: [Logs]
+ *     tags: [Workout sessions]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
+ *         description: session_id
  *         required: true
  *         schema:
  *           type: integer
