@@ -2,8 +2,14 @@
  * @swagger
  * /api/exercises:
  *   get:
- *     summary: Get all exercises
+ *     summary: Get all exercises or search exercises by name
  *     tags: [Master Data]
+ *     parameters:
+ *       - in: query
+ *         name: name
+ *         schema:
+ *           type: string
+ *         description: Search keyword for exercise name
  *     responses:
  *       200:
  *         description: List of exercises
@@ -23,8 +29,16 @@ import { successResponse, errorResponse } from '@/lib/response';
 import { fromZodError } from 'zod-validation-error';
 import { getAuthUser } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const searchParams = req.nextUrl.searchParams;
+    const name = searchParams.get('name');
+
+    if (name) {
+      const exercises = await ExerciseRepository.findByName(name);
+      return successResponse(exercises);
+    }
+
     const exercises = await ExerciseRepository.findAll();
     return successResponse(exercises);
   } catch (error: any) {

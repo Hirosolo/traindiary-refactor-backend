@@ -92,6 +92,17 @@ export const ExerciseRepository = {
     return data || [];
   },
 
+  async findByName(searchQuery: string): Promise<Exercise[]> {
+    const { data, error } = await supabase
+      .from('exercises')
+      .select('*')
+      .ilike('name', `%${searchQuery}%`)
+      .order('name', { ascending: true });
+    
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+
   async findById(id: number): Promise<Exercise | null> {
     const { data, error } = await supabase
       .from('exercises')
