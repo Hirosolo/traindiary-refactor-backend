@@ -46,6 +46,8 @@
  *             type: object
  *             required: [scheduled_date, exercises]
  *             properties:
+ *               userId:
+ *                 type: integer
  *               scheduled_date:
  *                 type: string
  *               type:
@@ -104,7 +106,15 @@ export async function POST(req: NextRequest) {
       return errorResponse(fromZodError(validation.error).message);
     }
 
-    const workout = await WorkoutRepository.create(user.userId, validation.data);
+    const legacyUserId = validation.data.userID ? Number(validation.data.userID) : undefined;
+    if (validation.data.userID && Number.isNaN(legacyUserId)) {
+      return errorResponse('Invalid userID', 400);
+    }
+
+    const requestedUserId = validation.data.userId ?? legacyUserId;
+    const targetUserId = requestedUserId ?? user.userId;
+
+    const workout = await WorkoutRepository.create(targetUserId, validation.data);
     return successResponse(workout, 'Workout session logged successfully', 201);
   } catch (error: any) {
     return errorResponse(error.message, 500);

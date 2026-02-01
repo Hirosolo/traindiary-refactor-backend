@@ -4,6 +4,7 @@
     "private": true,
     "scripts": {
         "dev": "next dev",
+        "prebuild": "tsx scripts/generate-swagger.ts",
         "build": "next build",
         "start": "next start",
         "lint": "next lint"
@@ -32,6 +33,7 @@
         "@types/swagger-ui-react": "^5.18.0",
         "postcss": "^8",
         "tailwindcss": "^4.0.0",
+        "tsx": "^4.21.0",
         "typescript": "^5"
     }
 }

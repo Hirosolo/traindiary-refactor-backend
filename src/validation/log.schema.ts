@@ -27,6 +27,8 @@ export const exerciseLogSchema = z.object({
 });
 
 export const requestWorkoutSchema = z.object({
+  userId: z.coerce.number().int().positive().optional(),
+  userID: z.string().optional(),
   scheduled_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
   type: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),

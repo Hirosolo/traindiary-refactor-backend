@@ -10,9 +10,13 @@
  *         application/json:
  *           schema:
  *             type: object
- *             required: [email, password]
+ *             required: [fullname, email, phone, password]
  *             properties:
+ *               fullname:
+ *                 type: string
  *               email:
+ *                 type: string
+ *               phone:
  *                 type: string
  *               password:
  *                 type: string

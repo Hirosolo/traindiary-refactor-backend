@@ -13,7 +13,12 @@ export const AuthService = {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(input.password, salt);
 
-    const user = await UserRepository.create(input.email, passwordHash);
+    const user = await UserRepository.create({
+      email: input.email,
+      passwordHash,
+      fullname: input.fullname,
+      phone: input.phone,
+    });
 
     const token = signToken({ userId: user.user_id, email: user.email });
 
@@ -21,6 +26,8 @@ export const AuthService = {
       user: {
         id: user.user_id,
         email: user.email,
+        fullname: user.username,
+        phone: user.phone_number,
       },
       token,
     };

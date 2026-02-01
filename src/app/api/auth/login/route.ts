@@ -3,6 +3,7 @@
  * /api/auth/login:
  *   post:
  *     summary: Login user
+ *     description: Authenticate a user using email and password and return an access token.
  *     tags: [Auth]
  *     requestBody:
  *       required: true

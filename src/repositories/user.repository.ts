@@ -37,10 +37,15 @@ export const UserRepository = {
     return data || null;
   },
 
-  async create(email: string, passwordHash: string): Promise<User> {
+  async create(userData: { email: string; passwordHash: string; fullname: string; phone: string }): Promise<User> {
     const { data, error } = await supabase
       .from('users')
-      .insert([{ email, password_hash: passwordHash }])
+      .insert([{ 
+        email: userData.email, 
+        password_hash: userData.passwordHash,
+        username: userData.fullname,
+        phone_number: userData.phone
+      }])
       .select()
       .single();
     
