@@ -1,9 +1,16 @@
 /**
  * @swagger
+ * tags:
+ *   name: Meal Logs
+ *   description: Log user meal
+ */
+
+/**
+ * @swagger
  * /api/meals/{id}:
  *   get:
  *     summary: Get meal details with all foods and nutrition values
- *     tags: [Logs]
+ *     tags: [Meal Logs]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -86,7 +93,7 @@
  *         description: Unauthorized
  *   delete:
  *     summary: Delete meal
- *     tags: [Logs]
+ *     tags: [Meal Logs]
  *     security:
  *       - bearerAuth: []
  *     parameters:
