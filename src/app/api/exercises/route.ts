@@ -1,5 +1,12 @@
 /**
  * @swagger
+ * tags:
+ *   name: Exercises
+ *   description: Exercises management
+ */
+
+/**
+ * @swagger
  * /api/exercises:
  *   get:
  *     summary: Get all exercises or search exercises by name
