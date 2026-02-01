@@ -1,10 +1,17 @@
 /**
  * @swagger
+ * tags:
+ *   name: Workout sessions
+ *   description: Workout sessions management
+ */
+
+/**
+ * @swagger
  * /api/workouts:
  *   get:
- *     summary: Get user workouts
+ *     summary: Get user workout sessions
  *     description: Retrieve all workout sessions for a user, optionally filtered by month or specific date
- *     tags: [Workouts]
+ *     tags: [Workout sessions]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -27,7 +34,7 @@
  *         example: 2026-02-01
  *     responses:
  *       200:
- *         description: List of workouts
+ *         description: List of workout session
  *         content:
  *           application/json:
  *             schema:
@@ -70,7 +77,7 @@
  *       400:
  *         description: User ID is required
  *       404:
- *         description: No workouts found in selected period
+ *         description: No workout session found in selected period
  *         content:
  *           application/json:
  *             schema:
@@ -88,7 +95,7 @@
  *   post:
  *     summary: Log a workout session
  *     description: Create a new workout session with exercises. Only one workout session is allowed per day.
- *     tags: [Workouts]
+ *     tags: [Workout sessions]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -167,7 +174,7 @@
  *   put:
  *     summary: Update workout session
  *     description: Update an existing workout session status, notes, or other details using session_id
- *     tags: [Workouts]
+ *     tags: [Workout sessions]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
