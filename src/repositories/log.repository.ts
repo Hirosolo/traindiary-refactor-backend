@@ -400,24 +400,6 @@ export const WorkoutRepository = {
       .single();
     if (error) throw new Error(error.message);
 
-    // Check if we should update the parent session_detail status
-    if (data.session_detail_id) {
-        const { data: siblingLogs } = await supabase
-            .from('sessions_exercise_details')
-            .select('status')
-            .eq('session_detail_id', data.session_detail_id);
-        
-        if (siblingLogs) {
-            const allCompleted = siblingLogs.every((l: any) => l.status === 'COMPLETED');
-            const newStatus = allCompleted ? 'COMPLETED' : 'UNFINISHED';
-            
-            await supabase
-                .from('session_details')
-                .update({ status: newStatus })
-                .eq('session_detail_id', data.session_detail_id);
-        }
-    }
-
     return data;
   },
 
@@ -446,21 +428,6 @@ export const WorkoutRepository = {
       .select()
       .single();
     if (error) throw new Error(error.message);
-
-    // Update parent status (usually creating a new set means exercise is unfinished unless explicitly completed)
-    const { data: siblingLogs } = await supabase
-        .from('sessions_exercise_details')
-        .select('status')
-        .eq('session_detail_id', sessionDetailId);
-    
-    if (siblingLogs) {
-        const allCompleted = siblingLogs.every((l: any) => l.status === 'COMPLETED');
-        const newStatus = allCompleted ? 'COMPLETED' : 'UNFINISHED';
-        await supabase
-            .from('session_details')
-            .update({ status: newStatus })
-            .eq('session_detail_id', sessionDetailId);
-    }
 
     return data;
   },
