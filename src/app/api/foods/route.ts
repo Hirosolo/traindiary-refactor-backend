@@ -91,6 +91,22 @@
  *                       vitamin_d_per_serving:
  *                         type: number
  *                         example: 0
+ *       404:
+ *         description: No foods found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: not found food base on the keyword
+ *                 data:
+ *                   type: array
+ *                   example: []
  *   post:
  *     summary: Create a new food
  *     tags: [Foods]
@@ -125,6 +141,36 @@
  *               image:
  *                 type: string
  *                 nullable: true
+ *               fibers_per_serving:
+ *                 type: number
+ *                 example: 10
+ *               sugars_per_serving:
+ *                 type: number
+ *                 example: 0
+ *               zincs_per_serving:
+ *                 type: number
+ *                 example: 0.003
+ *               magnesiums_per_serving:
+ *                 type: number
+ *                 example: 0.25
+ *               calciums_per_serving:
+ *                 type: number
+ *                 example: 0.1
+ *               irons_per_serving:
+ *                 type: number
+ *                 example: 0.003
+ *               vitamin_a_per_serving:
+ *                 type: number
+ *                 example: 0
+ *               vitamin_c_per_serving:
+ *                 type: number
+ *                 example: 0
+ *               vitamin_b12_per_serving:
+ *                 type: number
+ *                 example: 0
+ *               vitamin_d_per_serving:
+ *                 type: number
+ *                 example: 0
  *     responses:
  *       201:
  *         description: Food created successfully
@@ -157,6 +203,11 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search') || undefined;
 
     const foods = await FoodRepository.findAll(search);
+    
+    if (search && (!foods || foods.length === 0)) {
+      return errorResponse('not found any food math with the keyword', 404);
+    }
+    
     return successResponse(foods, 'Success', 200);
   } catch (error: any) {
     return errorResponse(error.message, 500);

@@ -8,6 +8,16 @@ export const foodSchema = z.object({
   fat_per_serving: z.number().min(0),
   serving_type: z.string().min(1, 'Serving type is required'),
   image: z.string().optional().nullable(),
+  fibers_per_serving: z.number().min(0).optional().nullable(),
+  sugars_per_serving: z.number().min(0).optional().nullable(),
+  zincs_per_serving: z.number().min(0).optional().nullable(),
+  magnesiums_per_serving: z.number().min(0).optional().nullable(),
+  calciums_per_serving: z.number().min(0).optional().nullable(),
+  irons_per_serving: z.number().min(0).optional().nullable(),
+  vitamin_a_per_serving: z.number().min(0).optional().nullable(),
+  vitamin_c_per_serving: z.number().min(0).optional().nullable(),
+  vitamin_b12_per_serving: z.number().min(0).optional().nullable(),
+  vitamin_d_per_serving: z.number().min(0).optional().nullable(),
 });
 
 export type FoodInput = z.infer<typeof foodSchema>;
