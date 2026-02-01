@@ -1,5 +1,12 @@
 /**
  * @swagger
+ * tags:
+ *   name: Auth
+ *   description: Signin, Signup and Verify email
+ */
+
+/**
+ * @swagger
  * /api/auth/cleanup-unverified:
  *   post:
  *     summary: Clean up expired unverified user accounts
