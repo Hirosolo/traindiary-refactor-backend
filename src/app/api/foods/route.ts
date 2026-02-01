@@ -9,11 +9,88 @@
  * @swagger
  * /api/foods:
  *   get:
- *     summary: Get all foods
+ *     summary: Get all foods or search foods by name
  *     tags: [Foods]
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search keyword for food name
  *     responses:
  *       200:
  *         description: List of foods
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Success
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       food_id:
+ *                         type: integer
+ *                         example: 71
+ *                       name:
+ *                         type: string
+ *                         example: Almonds
+ *                       calories_per_serving:
+ *                         type: number
+ *                         example: 579
+ *                       protein_per_serving:
+ *                         type: number
+ *                         example: 21
+ *                       carbs_per_serving:
+ *                         type: number
+ *                         example: 22
+ *                       fat_per_serving:
+ *                         type: number
+ *                         example: 50
+ *                       serving_type:
+ *                         type: string
+ *                         example: 100 g
+ *                       image:
+ *                         type: string
+ *                         nullable: true
+ *                         example: null
+ *                       fibers_per_serving:
+ *                         type: number
+ *                         example: 10
+ *                       sugars_per_serving:
+ *                         type: number
+ *                         example: 0
+ *                       zincs_per_serving:
+ *                         type: number
+ *                         example: 0.003
+ *                       magnesiums_per_serving:
+ *                         type: number
+ *                         example: 0.25
+ *                       calciums_per_serving:
+ *                         type: number
+ *                         example: 0.1
+ *                       irons_per_serving:
+ *                         type: number
+ *                         example: 0.003
+ *                       vitamin_a_per_serving:
+ *                         type: number
+ *                         example: 0
+ *                       vitamin_c_per_serving:
+ *                         type: number
+ *                         example: 0
+ *                       vitamin_b12_per_serving:
+ *                         type: number
+ *                         example: 0
+ *                       vitamin_d_per_serving:
+ *                         type: number
+ *                         example: 0
  *   post:
  *     summary: Create a new food
  *     tags: [Foods]
@@ -29,23 +106,43 @@
  *             properties:
  *               name:
  *                 type: string
+ *                 example: Almonds
  *               calories_per_serving:
  *                 type: number
+ *                 example: 579
  *               protein_per_serving:
  *                 type: number
+ *                 example: 21
  *               carbs_per_serving:
  *                 type: number
+ *                 example: 22
  *               fat_per_serving:
  *                 type: number
+ *                 example: 50
  *               serving_type:
  *                 type: string
+ *                 example: 100 g
  *               image:
  *                 type: string
+ *                 nullable: true
  *     responses:
  *       201:
- *         description: Food created
+ *         description: Food created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Food created successfully
  *       401:
  *         description: Unauthorized
+ *       400:
+ *         description: Validation error
  */
 import { NextRequest } from 'next/server';
 import { FoodRepository } from '@/repositories/master.repository';
@@ -60,7 +157,7 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search') || undefined;
 
     const foods = await FoodRepository.findAll(search);
-    return successResponse(foods);
+    return successResponse(foods, 'Success', 200);
   } catch (error: any) {
     return errorResponse(error.message, 500);
   }

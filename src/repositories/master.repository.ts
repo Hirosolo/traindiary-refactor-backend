@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from "@/lib/supabase";
 
 export interface Food {
   food_id: number;
@@ -13,63 +13,62 @@ export interface Food {
 
 export const FoodRepository = {
   async findAll(searchQuery?: string): Promise<Food[]> {
-    let query = supabase
-      .from('foods')
-      .select('*')
-      .order('name', { ascending: true });
+    const query = supabase
+      .from("foods")
+      .select("*")
+      .order("name", { ascending: true });
 
-    if (searchQuery) {
-      query = query.ilike('name', `%${searchQuery}%`);
+    if (searchQuery?.trim()) {
+      query.ilike("name", `%${searchQuery.trim()}%`);
     }
-    
+
     const { data, error } = await query;
+
     if (error) throw new Error(error.message);
-    return data || [];
+
+    return data ?? [];
   },
 
   async findById(id: number): Promise<Food | null> {
     const { data, error } = await supabase
-      .from('foods')
-      .select('*')
-      .eq('food_id', id)
+      .from("foods")
+      .select("*")
+      .eq("food_id", id)
       .single();
-    
-    if (error && error.code !== 'PGRST116') throw new Error(error.message);
+
+    if (error && error.code !== "PGRST116") throw new Error(error.message);
     return data || null;
   },
 
   async create(foodData: any): Promise<Food> {
     const { data, error } = await supabase
-      .from('foods')
+      .from("foods")
       .insert([foodData])
       .select()
       .single();
-    
+
     if (error) throw new Error(error.message);
     return data;
   },
 
   async update(id: number, foodData: any): Promise<Food | null> {
     const { data, error } = await supabase
-      .from('foods')
+      .from("foods")
       .update(foodData)
-      .eq('food_id', id)
+      .eq("food_id", id)
       .select()
       .single();
-    
+
     if (error) throw new Error(error.message);
     return data || null;
   },
 
   async delete(id: number): Promise<boolean> {
-    const { error } = await supabase
-      .from('foods')
-      .delete()
-      .eq('food_id', id);
-    
+    const { error } = await supabase.from("foods").delete().eq("food_id", id);
+
     if (error) throw new Error(error.message);
     return true;
-  }
+  },
 };
 
 export interface Exercise {
@@ -84,66 +83,66 @@ export interface Exercise {
 export const ExerciseRepository = {
   async findAll(): Promise<Exercise[]> {
     const { data, error } = await supabase
-      .from('exercises')
-      .select('*')
-      .order('name', { ascending: true });
-    
+      .from("exercises")
+      .select("*")
+      .order("name", { ascending: true });
+
     if (error) throw new Error(error.message);
     return data || [];
   },
 
   async findByName(searchQuery: string): Promise<Exercise[]> {
     const { data, error } = await supabase
-      .from('exercises')
-      .select('*')
-      .ilike('name', `%${searchQuery}%`)
-      .order('name', { ascending: true });
-    
+      .from("exercises")
+      .select("*")
+      .ilike("name", `%${searchQuery}%`)
+      .order("name", { ascending: true });
+
     if (error) throw new Error(error.message);
     return data || [];
   },
 
   async findById(id: number): Promise<Exercise | null> {
     const { data, error } = await supabase
-      .from('exercises')
-      .select('*')
-      .eq('exercise_id', id)
+      .from("exercises")
+      .select("*")
+      .eq("exercise_id", id)
       .single();
-    
-    if (error && error.code !== 'PGRST116') throw new Error(error.message);
+
+    if (error && error.code !== "PGRST116") throw new Error(error.message);
     return data || null;
   },
 
   async create(exerciseData: any): Promise<Exercise> {
     const { data, error } = await supabase
-      .from('exercises')
+      .from("exercises")
       .insert([exerciseData])
       .select()
       .single();
-    
+
     if (error) throw new Error(error.message);
     return data;
   },
 
   async update(id: number, exerciseData: any): Promise<Exercise | null> {
     const { data, error } = await supabase
-      .from('exercises')
+      .from("exercises")
       .update(exerciseData)
-      .eq('exercise_id', id)
+      .eq("exercise_id", id)
       .select()
       .single();
-    
+
     if (error) throw new Error(error.message);
     return data || null;
   },
 
   async delete(id: number): Promise<boolean> {
     const { error } = await supabase
-      .from('exercises')
+      .from("exercises")
       .delete()
-      .eq('exercise_id', id);
-    
+      .eq("exercise_id", id);
+
     if (error) throw new Error(error.message);
     return true;
-  }
+  },
 };
