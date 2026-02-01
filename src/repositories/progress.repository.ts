@@ -127,7 +127,8 @@ export const ProgressRepository = {
           d.logs?.forEach((l: any) => {
             const reps = l.reps || 0;
             const weight = l.weight_kg || 0;
-            const volume = reps * weight;
+            const effectiveWeight = weight > 0 ? weight : 1;
+            const volume = reps * effectiveWeight;
             totalVolume += volume;
             detailForce += volume * difficulty;
           });

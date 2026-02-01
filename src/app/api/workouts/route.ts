@@ -91,6 +91,9 @@ export async function GET(req: NextRequest) {
     const workouts = await WorkoutRepository.findByUserId(user.userId, { month, date });
     return successResponse(workouts);
   } catch (error: any) {
+    if (error?.message === 'WORKOUT_SESSION_ALREADY_EXISTS') {
+      return errorResponse('Only one workout session is allowed per day.', 409);
+    }
     return errorResponse(error.message, 500);
   }
 }

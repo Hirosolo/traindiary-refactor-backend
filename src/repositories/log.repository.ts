@@ -277,6 +277,33 @@ export const WorkoutRepository = {
   async create(userId: number, workoutData: any): Promise<any> {
     const { scheduled_date, type, notes, status = 'PENDING', exercises } = workoutData;
 
+    const datePart = (scheduled_date || '').toString().split(/[T ]/)[0];
+    const [yearStr, monthStr, dayStr] = datePart.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    const day = Number(dayStr);
+
+    if (!datePart || Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+      throw new Error('Invalid scheduled_date');
+    }
+
+    const startDate = `${yearStr}-${monthStr.padStart(2, '0')}-${dayStr.padStart(2, '0')}`;
+    const nextDate = new Date(year, month - 1, day + 1);
+    const endDate = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`;
+
+    const { data: existingSessions, error: existingError } = await supabase
+      .from('workout_sessions')
+      .select('session_id')
+      .eq('user_id', userId)
+      .gte('scheduled_date', startDate)
+      .lt('scheduled_date', endDate)
+      .limit(1);
+
+    if (existingError) throw new Error(existingError.message);
+    if (existingSessions && existingSessions.length > 0) {
+      throw new Error('WORKOUT_SESSION_ALREADY_EXISTS');
+    }
+
     const { data: session, error: sessionError } = await supabase
       .from('workout_sessions')
       .insert([{ user_id: userId, scheduled_date, type, notes, status }])
