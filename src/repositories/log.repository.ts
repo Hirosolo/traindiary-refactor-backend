@@ -52,6 +52,42 @@ const isCardioByLogId = async (logId: number): Promise<boolean> => {
   return isCardioBySessionDetailId(data?.session_detail_id as number);
 };
 
+const ensureSessionDetailOwnedByUser = async (sessionDetailId: number, userId?: number) => {
+  if (!userId) return;
+
+  const { data: detail, error: detailError } = await supabase
+    .from('session_details')
+    .select('session_id')
+    .eq('session_detail_id', sessionDetailId)
+    .single();
+
+  if (detailError) throw new Error(detailError.message);
+
+  const { data: session, error: sessionError } = await supabase
+    .from('workout_sessions')
+    .select('user_id')
+    .eq('session_id', detail.session_id)
+    .single();
+
+  if (sessionError) throw new Error(sessionError.message);
+
+  if (session.user_id !== userId) {
+    throw new Error('UNAUTHORIZED');
+  }
+};
+
+const getSessionDetailIdBySetId = async (setId: number): Promise<number> => {
+  const { data, error } = await supabase
+    .from('sessions_exercise_details')
+    .select('session_detail_id')
+    .eq('set_id', setId)
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  return data.session_detail_id as number;
+};
+
 export const MealRepository = {
   async findByUserId(userId: number, filters: { month?: string, date?: string } = {}): Promise<any[]> {
     let query = supabase
@@ -457,8 +493,10 @@ export const WorkoutRepository = {
     return session;
   },
 
-  async updateLog(logId: number, logData: any): Promise<any> {
+  async updateLog(logId: number, logData: any, userId?: number): Promise<any> {
     const updateData: any = {};
+    const sessionDetailId = await getSessionDetailIdBySetId(logId);
+    await ensureSessionDetailOwnedByUser(sessionDetailId, userId);
     const isCardio = await isCardioByLogId(logId);
 
     if (!isCardio && (logData.actual_reps !== undefined || logData.reps !== undefined)) {
@@ -494,7 +532,8 @@ export const WorkoutRepository = {
     return data;
   },
 
-  async createLog(sessionDetailId: number, logData: any): Promise<any> {
+  async createLog(sessionDetailId: number, logData: any, userId?: number): Promise<any> {
+    await ensureSessionDetailOwnedByUser(sessionDetailId, userId);
     const isCardio = await isCardioBySessionDetailId(sessionDetailId);
     // Ensure required fields have defaults
     let status = 'UNFINISHED';
@@ -524,6 +563,46 @@ export const WorkoutRepository = {
     if (error) throw new Error(error.message);
 
     return data;
+  },
+
+  async getLogsBySessionDetailId(sessionDetailId: number, userId?: number): Promise<any[]> {
+    await ensureSessionDetailOwnedByUser(sessionDetailId, userId);
+
+    const { data, error } = await supabase
+      .from('sessions_exercise_details')
+      .select('*')
+      .eq('session_detail_id', sessionDetailId)
+      .order('set_id', { ascending: true });
+
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+
+  async getLogBySetId(setId: number, userId?: number): Promise<any> {
+    const sessionDetailId = await getSessionDetailIdBySetId(setId);
+    await ensureSessionDetailOwnedByUser(sessionDetailId, userId);
+
+    const { data, error } = await supabase
+      .from('sessions_exercise_details')
+      .select('*')
+      .eq('set_id', setId)
+      .single();
+
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  async deleteLog(setId: number, userId?: number): Promise<boolean> {
+    const sessionDetailId = await getSessionDetailIdBySetId(setId);
+    await ensureSessionDetailOwnedByUser(sessionDetailId, userId);
+
+    const { error } = await supabase
+      .from('sessions_exercise_details')
+      .delete()
+      .eq('set_id', setId);
+
+    if (error) throw new Error(error.message);
+    return true;
   },
 
   async updateSession(sessionId: number, userId: number, sessionData: any): Promise<any> {
