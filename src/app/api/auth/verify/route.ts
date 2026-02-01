@@ -1,0 +1,112 @@
+/**
+ * @swagger
+ * /api/auth/verify:
+ *   post:
+ *     summary: Verify email with code or token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Email verified
+ *       400:
+ *         description: Verification failed
+ */
+import { NextRequest } from 'next/server';
+import { UserRepository } from '@/repositories/user.repository';
+import { verifyEmailSchema } from '@/validation/auth.schema';
+import { successResponse, errorResponse } from '@/lib/response';
+import { fromZodError } from 'zod-validation-error';
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+
+    const validation = verifyEmailSchema.safeParse(body);
+    if (!validation.success) {
+      const errorMessage = fromZodError(validation.error).message;
+      return errorResponse(errorMessage, 400);
+    }
+
+    const { email, code, token } = validation.data;
+
+    const user = token
+      ? await UserRepository.findByVerificationToken(token)
+      : email
+        ? await UserRepository.findByEmail(email)
+        : null;
+
+    if (!user) {
+      return errorResponse('Invalid verification details', 400);
+    }
+
+    if (user.verified) {
+      return successResponse(null, 'Email already verified', 200);
+    }
+
+    if (!user.verification_expires_at || new Date(user.verification_expires_at) < new Date()) {
+      await UserRepository.deleteById(user.user_id);
+      return errorResponse('Verification expired. Please sign up again.', 400);
+    }
+
+    if (token) {
+      if (user.verification_token !== token) {
+        return errorResponse('Invalid verification token', 400);
+      }
+    } else if (email && code) {
+      if (user.verification_code !== code) {
+        return errorResponse('Invalid verification code', 400);
+      }
+    } else {
+      return errorResponse('Invalid verification details', 400);
+    }
+
+    await UserRepository.verifyUser(user.user_id);
+    return successResponse(null, 'Email verified successfully', 200);
+  } catch (error: any) {
+    return errorResponse(error.message || 'Internal Server Error', 500);
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const token = req.nextUrl.searchParams.get('token');
+    if (!token) {
+      return errorResponse('Missing verification token', 400);
+    }
+
+    const user = await UserRepository.findByVerificationToken(token);
+    if (!user) {
+      return errorResponse('Invalid verification token', 400);
+    }
+
+    if (user.verified) {
+      return successResponse(null, 'Email already verified', 200);
+    }
+
+    if (!user.verification_expires_at || new Date(user.verification_expires_at) < new Date()) {
+      await UserRepository.deleteById(user.user_id);
+      return errorResponse('Verification expired. Please sign up again.', 400);
+    }
+
+    if (user.verification_token !== token) {
+      return errorResponse('Invalid verification token', 400);
+    }
+
+    await UserRepository.verifyUser(user.user_id);
+    return successResponse(null, 'Email verified successfully', 200);
+  } catch (error: any) {
+    return errorResponse(error.message || 'Internal Server Error', 500);
+  }
+}
