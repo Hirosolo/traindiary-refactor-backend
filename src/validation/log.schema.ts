@@ -33,7 +33,7 @@ export const requestWorkoutSchema = z.object({
   type: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'UNFINISHED', 'MISSED']).default('PENDING'),
-  exercises: z.array(exerciseLogSchema).min(1, 'At least one exercise log is required'),
+  exercises: z.array(exerciseLogSchema).optional(),
 });
 
 export type RequestWorkoutInput = z.infer<typeof requestWorkoutSchema>;
