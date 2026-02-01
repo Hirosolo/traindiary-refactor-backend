@@ -148,7 +148,7 @@
  *       401:
  *         description: Unauthorized - missing or invalid token
  *       400:
- *         description: Validation error
+ *         description: Wrong format
  */
 import { NextRequest } from 'next/server';
 import { ExerciseRepository } from '@/repositories/master.repository';
@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validation = exerciseSchema.safeParse(body);
     if (!validation.success) {
-      return errorResponse(fromZodError(validation.error).message);
+      return errorResponse("Wrong format",400);
     }
 
     const exercise = await ExerciseRepository.create(validation.data);

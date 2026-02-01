@@ -265,7 +265,7 @@ export async function PUT(
     }
 
     const food = await FoodRepository.update(foodId,  validation.data);
-    if (!food) return errorResponse("Faild to update food", 404);
+    if (!food) return errorResponse("Faild to update food", 417);
     return successResponse(food, "Food updated successfully");
   } catch (error: any) {
     return errorResponse(error.message, 500);
@@ -288,6 +288,7 @@ export async function DELETE(
     }
 
     const deleted = await FoodRepository.delete(foodId);
+    if (!deleted) return errorResponse("Faild to delete food", 417);
     return successResponse(null, "Food deleted successfully");
   } catch (error: any) {
     return errorResponse(error.message, 500);

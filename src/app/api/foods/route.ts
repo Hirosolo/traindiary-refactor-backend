@@ -188,7 +188,7 @@
  *       401:
  *         description: Unauthorized
  *       400:
- *         description: Validation error
+ *         description: Wrong format
  */
 import { NextRequest } from 'next/server';
 import { FoodRepository } from '@/repositories/master.repository';
