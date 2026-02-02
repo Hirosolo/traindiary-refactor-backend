@@ -162,7 +162,7 @@ async function handleGET(req: NextRequest) {
  *                 example: "2023-10-27"
  *               type:
  *                 type: string
- *                 example: "Hypertrophy"
+ *                 example: "strength"
  *               notes:
  *                 type: string
  *                 nullable: true
@@ -322,16 +322,13 @@ async function handlePOST(req: NextRequest) {
  *                     example: "2023-10-28"
  *                   type:
  *                     type: string
- *                     example: "Cardio"
+ *                     example: "stength"
  *                   notes:
  *                     type: string
  *                     example: "Updated note"
  *                   status:
  *                     type: string
  *                     example: "completed"
- *                   gr_score:
- *                     type: integer
- *                     example: 90
  *               - type: object
  *                 description: Batch status update
  *                 required: [ids, status]
@@ -346,7 +343,7 @@ async function handlePOST(req: NextRequest) {
  *                     example: "completed"
  *     responses:
  *       200:
- *         description: Session(s) updated successfully
+ *         description: Session updated successfully
  *         content:
  *           application/json:
  *             schema:
@@ -358,9 +355,23 @@ async function handlePOST(req: NextRequest) {
  *                 data:
  *                   type: object
  *                   properties:
- *                     updated:
+ *                     session_id:
  *                       type: integer
- *                       example: 2
+ *                       example: 113
+ *                     scheduled_date:
+ *                       type: string
+ *                       format: date
+ *                       example: "2026-02-03"
+ *                     type:
+ *                       type: string
+ *                       example: "strength"
+ *                     notes:
+ *                       type: string
+ *                       nullable: true
+ *                       example: "Updated note"
+ *                     status:
+ *                       type: string
+ *                       example: "PENDING"
  *       400:
  *         description: Validation error
  *         content:
@@ -429,17 +440,19 @@ async function handlePUT(req: NextRequest) {
     if (status) updateData.status = status;
     if (gr_score !== undefined) updateData.gr_score = gr_score;
 
-    const { error: updateError } = await supabase
+    const { data: updatedSession, error: updateError } = await supabase
       .from('workout_sessions')
       .update(updateData)
       .eq('session_id', session_id)
-      .eq('user_id', user!.userId);
+      .eq('user_id', user!.userId)
+      .select('session_id, scheduled_date, type, notes, status')
+      .single();
 
-    if (updateError) {
+    if (updateError || !updatedSession) {
       return errorResponse('DATABASE_ERROR', 'Failed to update session', 400);
     }
 
-    return successResponse({ session_id, ...updateData });
+    return successResponse(updatedSession);
   } catch (error) {
     console.error('[PUT /sessions] Error:', error);
     return errorResponse('INTERNAL_ERROR', 'Internal server error', 400);

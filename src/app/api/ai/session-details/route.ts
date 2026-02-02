@@ -390,6 +390,90 @@ async function handlePOST(req: NextRequest) {
  *                 message:
  *                   type: string
  *                   example: "Insufficient permissions"
+ *   delete:
+ *     summary: Delete session exercises
+ *     description: Delete one or more session exercises (session_details) by their IDs. Verifies ownership.
+ *     tags: [AI - Workout Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ids]
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items:
+ *                   type: integer
+ *                 example: [201, 202]
+ *     responses:
+ *       200:
+ *         description: Session exercises deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     deleted:
+ *                       type: integer
+ *                       example: 2
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error_code:
+ *                   type: string
+ *                   example: "VALIDATION_ERROR"
+ *                 message:
+ *                   type: string
+ *                   example: "Missing or invalid ids array"
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error_code:
+ *                   type: string
+ *                   example: "UNAUTHORIZED"
+ *                 message:
+ *                   type: string
+ *                   example: "Missing or invalid authorization token"
+ *       403:
+ *         description: Access denied
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error_code:
+ *                   type: string
+ *                   example: "ACCESS_DENIED"
+ *                 message:
+ *                   type: string
+ *                   example: "Insufficient permissions"
  */
 async function handlePUT(req: NextRequest) {
   const { user, error } = authenticate(req);
@@ -446,6 +530,59 @@ async function handlePUT(req: NextRequest) {
 }
 
 /**
+ * DELETE handler for batch delete session details
+ */
+async function handleDELETE(req: NextRequest) {
+  const { user, error } = authenticate(req);
+  if (error) return error;
+
+  try {
+    const body = await req.json();
+    const { ids } = body;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return errorResponse('VALIDATION_ERROR', 'Missing or invalid ids array', 400);
+    }
+
+    // Verify ownership: All session_details must belong to user's sessions
+    const { data: sessionDetails, error: fetchError } = await supabase
+      .from('session_details')
+      .select('session_id')
+      .in('session_detail_id', ids);
+
+    if (fetchError || !sessionDetails) {
+      return errorResponse('DATABASE_ERROR', 'Failed to verify ownership', 400);
+    }
+
+    const sessionIds = sessionDetails.map((sd: any) => sd.session_id);
+
+    const { data: sessions, error: sessionError } = await supabase
+      .from('workout_sessions')
+      .select('user_id')
+      .in('session_id', sessionIds);
+
+    if (sessionError || !sessions || !sessions.every((s: any) => s.user_id === user!.userId)) {
+      return errorResponse('ACCESS_DENIED', 'Insufficient permissions', 403);
+    }
+
+    // Delete session details
+    const { error: deleteError } = await supabase
+      .from('session_details')
+      .delete()
+      .in('session_detail_id', ids);
+
+    if (deleteError) {
+      return errorResponse('DATABASE_ERROR', 'Failed to delete session exercises', 400);
+    }
+
+    return successResponse({ deleted: ids.length });
+  } catch (error) {
+    console.error('[DELETE /session-details] Error:', error);
+    return errorResponse('INTERNAL_ERROR', 'Internal server error', 400);
+  }
+}
+
+/**
  * Main handlers for /api/ai/session-details
  */
 export async function GET(req: NextRequest) {
@@ -458,4 +595,8 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   return handlePUT(req);
+}
+
+export async function DELETE(req: NextRequest) {
+  return handleDELETE(req);
 }
