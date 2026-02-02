@@ -217,6 +217,54 @@
  *         description: Missing session_id or invalid JSON
  *       401:
  *         description: Unauthorized
+ *   delete:
+ *     summary: Delete a session detail
+ *     description: Delete a specific session detail (exercise) from a workout session using session_detail_id
+ *     tags: [Sesssions details]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [session_detail_id]
+ *             properties:
+ *               session_detail_id:
+ *                 type: integer
+ *                 description: The ID of the session detail to delete
+ *                 example: 1
+ *               userId:
+ *                 type: integer
+ *                 description: Optional user ID (if not provided, uses authenticated user)
+ *                 example: 14
+ *     responses:
+ *       200:
+ *         description: Session detail deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     message:
+ *                       type: string
+ *                       example: Workout session deleted
+ *       400:
+ *         description: Missing session_detail_id
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
  */
 import { NextRequest } from "next/server";
 import { WorkoutRepository } from "@/repositories/log.repository";
@@ -316,6 +364,23 @@ export async function PUT(req: NextRequest) {
       updateData,
     );
     return successResponse(result, "Workout session updated");
+  } catch (error: any) {
+    return errorResponse(error.message, 500);
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = getAuthUser(req);
+    if (!user) return errorResponse("Unauthorized", 401);
+    const body = await req.json();
+    const { session_detail_id, userId } = body;
+    if (!session_detail_id) {
+      return errorResponse("session_detail_id is required", 400);
+    }
+    const targetUserId = userId || user.userId;
+    await WorkoutRepository.deleteSessionDetailById(session_detail_id, targetUserId);
+    return successResponse({ message: "Workout session deleted" });
   } catch (error: any) {
     return errorResponse(error.message, 500);
   }

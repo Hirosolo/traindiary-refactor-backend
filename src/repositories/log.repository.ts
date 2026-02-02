@@ -18,6 +18,20 @@ const buildExerciseTypeMap = async (exerciseIds: number[]) => {
   return map;
 };
 
+const deleteSessionDetailById = async (sessionDetailId: number, userId?: number): Promise<boolean> => {
+  if (userId) {
+    await ensureSessionDetailOwnedByUser(sessionDetailId, userId);
+  }
+
+  const { error } = await supabase
+    .from('session_details')
+    .delete()
+    .eq('session_detail_id', sessionDetailId);
+
+  if (error) throw new Error(error.message);
+  return true;
+};
+
 const isCardioBySessionDetailId = async (sessionDetailId: number): Promise<boolean> => {
   const { data, error } = await supabase
     .from('session_details')
@@ -664,5 +678,9 @@ export const WorkoutRepository = {
     
     if (error) throw new Error(error.message);
     return true;
+  },
+
+  async deleteSessionDetailById(sessionDetailId: number, userId?: number): Promise<boolean> {
+    return deleteSessionDetailById(sessionDetailId, userId);
   }
 };
