@@ -6,22 +6,22 @@ import { authenticate, errorResponse, successResponse } from '../utils';
  * @swagger
  * /api/ai/session-details:
  *   get:
- *     summary: Get session exercises
- *     description: Retrieve all exercises for a specific workout session with exercise details.
+ *     summary: Get exercise sets/logs
+ *     description: Retrieve all sets/logs for a specific exercise detail (session_detail_id) with exercise set details.
  *     tags: [AI - Workout Tracking]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: session_id
+ *         name: session_detail_id
  *         required: true
  *         schema:
  *           type: integer
- *         description: Session ID to get exercises for
- *         example: 101
+ *         description: Session detail ID to get exercise sets for
+ *         example: 201
  *     responses:
  *       200:
- *         description: Session exercises retrieved successfully
+ *         description: Exercise sets retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -35,29 +35,33 @@ import { authenticate, errorResponse, successResponse } from '../utils';
  *                   items:
  *                     type: object
  *                     properties:
+ *                       set_id:
+ *                         type: integer
+ *                         example: 505
  *                       session_detail_id:
  *                         type: integer
  *                         example: 201
- *                       session_id:
+ *                       reps:
  *                         type: integer
- *                         example: 101
- *                       exercise_id:
+ *                         example: 10
+ *                       weight_kg:
+ *                         type: number
+ *                         format: float
+ *                         nullable: true
+ *                         example: 20.5
+ *                       duration:
  *                         type: integer
- *                         example: 50
+ *                         nullable: true
+ *                         example: 0
+ *                       notes:
+ *                         type: string
+ *                         nullable: true
+ *                         example: "Easy RPE"
  *                       status:
  *                         type: string
- *                         example: "pending"
- *                       exercises:
- *                         type: object
- *                         properties:
- *                           exercise_id:
- *                             type: integer
- *                             example: 50
- *                           name:
- *                             type: string
- *                             example: "Squat"
+ *                         example: "completed"
  *       400:
- *         description: Missing session_id parameter
+ *         description: Missing session_detail_id parameter
  *         content:
  *           application/json:
  *             schema:
@@ -71,7 +75,7 @@ import { authenticate, errorResponse, successResponse } from '../utils';
  *                   example: "VALIDATION_ERROR"
  *                 message:
  *                   type: string
- *                   example: "Missing session_id parameter"
+ *                   example: "Missing session_detail_id parameter"
  *       401:
  *         description: Unauthorized
  *         content:
@@ -89,7 +93,7 @@ import { authenticate, errorResponse, successResponse } from '../utils';
  *                   type: string
  *                   example: "Missing or invalid authorization token"
  *       404:
- *         description: Session not found or access denied
+ *         description: Session detail not found or access denied
  *         content:
  *           application/json:
  *             schema:
@@ -103,45 +107,49 @@ import { authenticate, errorResponse, successResponse } from '../utils';
  *                   example: "ENTITY_NOT_FOUND"
  *                 message:
  *                   type: string
- *                   example: "Session not found or access denied"
+ *                   example: "Session detail not found or access denied"
  */
 async function handleGET(req: NextRequest) {
   const { user, error } = authenticate(req);
   if (error) return error;
 
   const { searchParams } = new URL(req.url);
-  const sessionId = searchParams.get('session_id');
+  const sessionDetailId = searchParams.get('session_detail_id');
 
-  if (!sessionId) {
-    return errorResponse('VALIDATION_ERROR', 'Missing session_id parameter', 400);
+  if (!sessionDetailId) {
+    return errorResponse('VALIDATION_ERROR', 'Missing session_detail_id parameter', 400);
   }
 
   try {
-    // Verify session ownership
-    const { data: sessionData, error: sessionError } = await supabase
-      .from('workout_sessions')
-      .select('user_id')
-      .eq('session_id', parseInt(sessionId))
+    // Verify session detail ownership
+    const { data: sessionDetail, error: sdError } = await supabase
+      .from('session_details')
+      .select('session_id')
+      .eq('session_detail_id', parseInt(sessionDetailId))
       .single();
 
-    if (sessionError || !sessionData || sessionData.user_id !== user!.userId) {
-      return errorResponse('ENTITY_NOT_FOUND', 'Session not found or access denied', 404);
+    if (sdError || !sessionDetail) {
+      return errorResponse('ENTITY_NOT_FOUND', 'Session detail not found or access denied', 404);
     }
 
-    // Get session details with exercise info
+    const { data: session, error: sessionError } = await supabase
+      .from('workout_sessions')
+      .select('user_id')
+      .eq('session_id', sessionDetail.session_id)
+      .single();
+
+    if (sessionError || !session || session.user_id !== user!.userId) {
+      return errorResponse('ENTITY_NOT_FOUND', 'Session detail not found or access denied', 404);
+    }
+
+    // Get all exercise sets/logs for this session detail
     const { data, error: dbError } = await supabase
-      .from('session_details')
-      .select(
-        `*,
-        exercises (
-          exercise_id,
-          name
-        )`
-      )
-      .eq('session_id', parseInt(sessionId));
+      .from('sessions_exercise_details')
+      .select('*')
+      .eq('session_detail_id', parseInt(sessionDetailId));
 
     if (dbError) {
-      return errorResponse('DATABASE_ERROR', 'Failed to fetch session details', 400);
+      return errorResponse('DATABASE_ERROR', 'Failed to fetch exercise sets', 400);
     }
 
     return successResponse(data || []);

@@ -100,10 +100,13 @@ async function handleGET(req: NextRequest) {
 
   try {
     if (sessionId) {
-      // Get specific session by ID
+      // Get specific session by ID with session details
       const { data, error: dbError } = await supabase
         .from('workout_sessions')
-        .select('*')
+        .select(`
+          *,
+          session_details (*)
+        `)
         .eq('session_id', parseInt(sessionId))
         .eq('user_id', user!.userId)
         .single();
@@ -114,10 +117,13 @@ async function handleGET(req: NextRequest) {
 
       return successResponse([data]);
     } else {
-      // Get user's workout history
+      // Get user's workout history with session details
       const { data, error: dbError } = await supabase
         .from('workout_sessions')
-        .select('*')
+        .select(`
+          *,
+          session_details (*)
+        `)
         .eq('user_id', user!.userId)
         .order('scheduled_date', { ascending: false });
 
