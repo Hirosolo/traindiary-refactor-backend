@@ -3,7 +3,7 @@
  * /api/workouts/{id}/session-details:
 @@   delete:
 @@     summary: Delete an exercise from a workout session
-@@     tags: [Logs]
+@@     tags: [Session details]
 @@     security:
 @@       - bearerAuth: []
 @@     parameters:
@@ -35,7 +35,7 @@
 @@         description: Session detail not found
  *   post:
  *     summary: Add exercises to an existing workout session
- *     tags: [Logs]
+ *     tags: [Session details]
  *     security:
  *       - bearerAuth: []
  *     parameters:
