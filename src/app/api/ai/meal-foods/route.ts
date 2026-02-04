@@ -176,29 +176,43 @@ async function handlePOST(req: NextRequest) {
  * @swagger
  * /api/ai/meal-foods:
  *   put:
- *     summary: Update food servings
- *     description: Update the number of servings for a food item in a meal. Verifies ownership.
+ *     summary: Bulk update food servings in a meal
+ *     description: |
+ *       Update the number of servings for multiple foods in a meal.
+ *       Verifies meal ownership and returns ALL foods currently in the meal after update.
  *     tags: [AI - Nutrition Tracking]
  *     security:
  *       - bearerAuth: []
+ *
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [meal_detail_id, numbers_of_serving]
+ *             required: [meal_id, foods]
  *             properties:
- *               meal_detail_id:
+ *               meal_id:
  *                 type: integer
- *                 example: 901
- *               numbers_of_serving:
- *                 type: number
- *                 format: float
- *                 example: 2.0
+ *                 example: 300
+ *               foods:
+ *                 type: array
+ *                 minItems: 1
+ *                 items:
+ *                   type: object
+ *                   required: [food_id, numbers_of_serving]
+ *                   properties:
+ *                     food_id:
+ *                       type: integer
+ *                       example: 55
+ *                     numbers_of_serving:
+ *                       type: number
+ *                       format: float
+ *                       example: 2.0
+ *
  *     responses:
  *       200:
- *         description: Food servings updated successfully
+ *         description: Foods updated successfully. Returns all foods in the meal.
  *         content:
  *           application/json:
  *             schema:
@@ -208,16 +222,27 @@ async function handlePOST(req: NextRequest) {
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   type: object
- *                   properties:
- *                     meal_detail_id:
- *                       type: integer
- *                       example: 901
- *                     numbers_of_serving:
- *                       type: number
- *                       example: 2.0
+ *                   type: array
+ *                   description: List of all meal details after update
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       meal_detail_id:
+ *                         type: integer
+ *                         example: 901
+ *                       meal_id:
+ *                         type: integer
+ *                         example: 300
+ *                       food_id:
+ *                         type: integer
+ *                         example: 55
+ *                       numbers_of_serving:
+ *                         type: number
+ *                         format: float
+ *                         example: 2.0
+ *
  *       400:
- *         description: Validation error
+ *         description: Validation or database error
  *         content:
  *           application/json:
  *             schema:
@@ -231,55 +256,16 @@ async function handlePOST(req: NextRequest) {
  *                   example: "VALIDATION_ERROR"
  *                 message:
  *                   type: string
- *                   example: "Missing required fields: meal_detail_id, numbers_of_serving"
+ *                   example: "meal_id and foods[] are required"
+ *
  *       401:
  *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error_code:
- *                   type: string
- *                   example: "UNAUTHORIZED"
- *                 message:
- *                   type: string
- *                   example: "Missing or invalid authorization token"
+ *
  *       403:
- *         description: Access denied
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error_code:
- *                   type: string
- *                   example: "ACCESS_DENIED"
- *                 message:
- *                   type: string
- *                   example: "Insufficient permissions"
- *       404:
- *         description: Meal detail not found
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error_code:
- *                   type: string
- *                   example: "ENTITY_NOT_FOUND"
- *                 message:
- *                   type: string
- *                   example: "Meal detail not found"
+ *         description: Access denied - Meal does not belong to user
+ *
+ *       500:
+ *         description: Internal server error
  */
 async function handlePUT(req: NextRequest) {
   const { user, error } = authenticate(req);
@@ -287,51 +273,66 @@ async function handlePUT(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { meal_detail_id, numbers_of_serving } = body;
+    const { meal_id, foods } = body;
 
-    if (!meal_detail_id || numbers_of_serving === undefined) {
+    // Validate
+    if (!meal_id || !Array.isArray(foods) || foods.length === 0) {
       return errorResponse(
         "VALIDATION_ERROR",
-        "Missing required fields: meal_detail_id, numbers_of_serving",
-        400,
+        "meal_id and foods[] are required",
+        400
       );
     }
 
-    // Verify ownership: meal_detail_id -> meal_id -> user_id
-    const { data: mealDetail, error: fetchError } = await supabase
-      .from("user_meal_details")
-      .select("meal_id")
-      .eq("meal_detail_id", meal_detail_id)
-      .single();
-
-    if (fetchError || !mealDetail) {
-      return errorResponse("ENTITY_NOT_FOUND", "Meal detail not found", 404);
-    }
-
+    // Verify meal ownership
     const { data: meal, error: mealError } = await supabase
       .from("user_meals")
       .select("user_id")
-      .eq("meal_id", mealDetail.meal_id)
+      .eq("meal_id", meal_id)
       .single();
 
     if (mealError || !meal || meal.user_id !== user!.userId) {
       return errorResponse("ACCESS_DENIED", "Insufficient permissions", 403);
     }
 
-    // Update meal food
-    const { error: updateError } = await supabase
-      .from("user_meal_details")
-      .update({ numbers_of_serving })
-      .eq("meal_detail_id", meal_detail_id);
-
-    if (updateError) {
-      return errorResponse("DATABASE_ERROR", "Failed to update meal food", 400);
+    // Validate each food
+    for (const item of foods) {
+      if (!item.food_id || item.numbers_of_serving === undefined) {
+        return errorResponse(
+          "VALIDATION_ERROR",
+          "Each food must have food_id and numbers_of_serving",
+          400
+        );
+      }
     }
 
-    return successResponse({ meal_detail_id, numbers_of_serving });
-  } catch (error) {
-    console.error("[PUT /meal-foods] Error:", error);
-    return errorResponse("INTERNAL_ERROR", "Internal server error", 400);
+    // Update each row
+    for (const item of foods) {
+      const { error: updateError } = await supabase
+        .from("user_meal_details")
+        .update({ numbers_of_serving: item.numbers_of_serving })
+        .eq("meal_id", meal_id)
+        .eq("food_id", item.food_id);
+
+      if (updateError) {
+        return errorResponse("DATABASE_ERROR", "Failed to update meal foods", 400);
+      }
+    }
+
+    // Return full meal state (best UX)
+    const { data, error: fetchError } = await supabase
+      .from("user_meal_details")
+      .select("*")
+      .eq("meal_id", meal_id);
+
+    if (fetchError) {
+      return errorResponse("DATABASE_ERROR", "Failed to fetch updated meal", 400);
+    }
+
+    return successResponse(data);
+  } catch (err) {
+    console.error("[PUT /meal-foods] Error:", err);
+    return errorResponse("INTERNAL_ERROR", "Internal server error", 500);
   }
 }
 
