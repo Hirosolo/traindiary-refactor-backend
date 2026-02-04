@@ -49,7 +49,7 @@ export const successResponse = (
 export const errorResponse = (
   errorCode: string,
   message: string,
-  status: 400 | 401 | 403 | 404 | 409 = 400
+  status: 400 | 401 | 403 | 404 | 409 | 500 = 400
 ): NextResponse => {
   return NextResponse.json(
     {

@@ -1,13 +1,15 @@
-import { NextRequest } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { authenticate, errorResponse, successResponse } from '../utils';
+import { NextRequest } from "next/server";
+import { supabase } from "@/lib/supabase";
+import { authenticate, errorResponse, successResponse } from "../utils";
 
 /**
  * @swagger
  * /api/ai/meal-foods:
  *   post:
- *     summary: Add food to meal
- *     description: Add a food item to a meal with serving quantity. Verifies meal ownership.
+ *     summary: Add multiple foods to meal
+ *     description: |
+ *       Bulk add multiple food items to a meal with serving quantities.
+ *       Verifies meal ownership and returns ALL foods currently in the meal after insertion.
  *     tags: [AI - Nutrition Tracking]
  *     security:
  *       - bearerAuth: []
@@ -17,21 +19,29 @@ import { authenticate, errorResponse, successResponse } from '../utils';
  *         application/json:
  *           schema:
  *             type: object
- *             required: [meal_id, food_id, numbers_of_serving]
+ *             required: [meal_id, foods]
  *             properties:
  *               meal_id:
  *                 type: integer
  *                 example: 300
- *               food_id:
- *                 type: integer
- *                 example: 55
- *               numbers_of_serving:
- *                 type: number
- *                 format: float
- *                 example: 1.5
+ *               foods:
+ *                 type: array
+ *                 minItems: 1
+ *                 items:
+ *                   type: object
+ *                   required: [food_id, numbers_of_serving]
+ *                   properties:
+ *                     food_id:
+ *                       type: integer
+ *                       example: 55
+ *                     numbers_of_serving:
+ *                       type: number
+ *                       format: float
+ *                       example: 1.5
+ *
  *     responses:
  *       201:
- *         description: Food added to meal successfully
+ *         description: Foods added successfully. Returns all foods in the meal.
  *         content:
  *           application/json:
  *             schema:
@@ -41,13 +51,27 @@ import { authenticate, errorResponse, successResponse } from '../utils';
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   type: object
- *                   properties:
- *                     meal_detail_id:
- *                       type: integer
- *                       example: 901
+ *                   type: array
+ *                   description: List of all meal details for this meal
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       meal_detail_id:
+ *                         type: integer
+ *                         example: 901
+ *                       meal_id:
+ *                         type: integer
+ *                         example: 300
+ *                       food_id:
+ *                         type: integer
+ *                         example: 55
+ *                       numbers_of_serving:
+ *                         type: number
+ *                         format: float
+ *                         example: 1.5
+ *
  *       400:
- *         description: Validation error
+ *         description: Validation or database error
  *         content:
  *           application/json:
  *             schema:
@@ -61,86 +85,90 @@ import { authenticate, errorResponse, successResponse } from '../utils';
  *                   example: "VALIDATION_ERROR"
  *                 message:
  *                   type: string
- *                   example: "Missing required fields: meal_id, food_id, numbers_of_serving"
+ *                   example: "meal_id and foods[] are required"
+ *
  *       401:
  *         description: Unauthorized
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error_code:
- *                   type: string
- *                   example: "UNAUTHORIZED"
- *                 message:
- *                   type: string
- *                   example: "Missing or invalid authorization token"
+ *
  *       403:
- *         description: Access denied - Meal does not belong to user
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error_code:
- *                   type: string
- *                   example: "ACCESS_DENIED"
- *                 message:
- *                   type: string
- *                   example: "Meal does not belong to user"
+ *         description: Meal does not belong to user
+ *
+ *       500:
+ *         description: Internal server error
  */
+
 async function handlePOST(req: NextRequest) {
   const { user, error } = authenticate(req);
   if (error) return error;
 
   try {
     const body = await req.json();
-    const { meal_id, food_id, numbers_of_serving } = body;
+    const { meal_id, foods } = body;
 
-    if (!meal_id || !food_id || numbers_of_serving === undefined) {
+    // Validate input
+    if (!meal_id || !Array.isArray(foods) || foods.length === 0) {
       return errorResponse(
-        'VALIDATION_ERROR',                                                     
-        'Missing required fields: meal_id, food_id, numbers_of_serving',
-        400
+        "VALIDATION_ERROR",
+        "meal_id and foods[] are required",
+        400,
       );
     }
 
-    // Security Check: Verify meal ownership
+    // Security check: verify meal ownership
     const { data: meal, error: mealError } = await supabase
-      .from('user_meals')
-      .select('user_id')
-      .eq('meal_id', meal_id)
+      .from("user_meals")
+      .select("user_id")
+      .eq("meal_id", meal_id)
       .single();
 
     if (mealError || !meal || meal.user_id !== user!.userId) {
-      return errorResponse('ACCESS_DENIED', 'Meal does not belong to user', 403);
+      return errorResponse(
+        "ACCESS_DENIED",
+        "Meal does not belong to user",
+        403,
+      );
     }
 
-    // Insert meal food
-    const { data, error: insertError } = await supabase
-      .from('user_meal_details')
-      .insert({
-        meal_id,
-        food_id,
-        numbers_of_serving,
-      })
-      .select('meal_detail_id')
-      .single();
-
-    if (insertError || !data) {
-      return errorResponse('DATABASE_ERROR', 'Failed to add food to meal', 400);
+    // Validate each food item
+    for (const item of foods) {
+      if (!item.food_id || item.numbers_of_serving === undefined) {
+        return errorResponse(
+          "VALIDATION_ERROR",
+          "Each food must have food_id and numbers_of_serving",
+          400,
+        );
+      }
     }
+
+    // Prepare rows for bulk insert
+    const rows = foods.map((item: any) => ({
+      meal_id,
+      food_id: item.food_id,
+      numbers_of_serving: item.numbers_of_serving,
+    }));
+
+    // Bulk insert
+    const { error: insertError } = await supabase
+      .from("user_meal_details")
+      .insert(rows);
+
+    if (insertError) {
+      return errorResponse(
+        "DATABASE_ERROR",
+        "Failed to add foods to meal",
+        400,
+      );
+    }
+
+    const data = await supabase
+  .from('user_meal_details')
+  .select('*')
+  .eq('meal_id', meal_id);
 
     return successResponse(data, 201);
-  } catch (error) {
-    console.error('[POST /meal-foods] Error:', error);
-    return errorResponse('INTERNAL_ERROR', 'Internal server error', 400);
+  } catch (err) {
+    console.error("[POST /meal-foods] Error:", err);
+    return errorResponse("INTERNAL_ERROR", "Internal server error", 500);
   }
 }
 
@@ -263,47 +291,47 @@ async function handlePUT(req: NextRequest) {
 
     if (!meal_detail_id || numbers_of_serving === undefined) {
       return errorResponse(
-        'VALIDATION_ERROR',
-        'Missing required fields: meal_detail_id, numbers_of_serving',
-        400
+        "VALIDATION_ERROR",
+        "Missing required fields: meal_detail_id, numbers_of_serving",
+        400,
       );
     }
 
     // Verify ownership: meal_detail_id -> meal_id -> user_id
     const { data: mealDetail, error: fetchError } = await supabase
-      .from('user_meal_details')
-      .select('meal_id')
-      .eq('meal_detail_id', meal_detail_id)
+      .from("user_meal_details")
+      .select("meal_id")
+      .eq("meal_detail_id", meal_detail_id)
       .single();
 
     if (fetchError || !mealDetail) {
-      return errorResponse('ENTITY_NOT_FOUND', 'Meal detail not found', 404);
+      return errorResponse("ENTITY_NOT_FOUND", "Meal detail not found", 404);
     }
 
     const { data: meal, error: mealError } = await supabase
-      .from('user_meals')
-      .select('user_id')
-      .eq('meal_id', mealDetail.meal_id)
+      .from("user_meals")
+      .select("user_id")
+      .eq("meal_id", mealDetail.meal_id)
       .single();
 
     if (mealError || !meal || meal.user_id !== user!.userId) {
-      return errorResponse('ACCESS_DENIED', 'Insufficient permissions', 403);
+      return errorResponse("ACCESS_DENIED", "Insufficient permissions", 403);
     }
 
     // Update meal food
     const { error: updateError } = await supabase
-      .from('user_meal_details')
+      .from("user_meal_details")
       .update({ numbers_of_serving })
-      .eq('meal_detail_id', meal_detail_id);
+      .eq("meal_detail_id", meal_detail_id);
 
     if (updateError) {
-      return errorResponse('DATABASE_ERROR', 'Failed to update meal food', 400);
+      return errorResponse("DATABASE_ERROR", "Failed to update meal food", 400);
     }
 
     return successResponse({ meal_detail_id, numbers_of_serving });
   } catch (error) {
-    console.error('[PUT /meal-foods] Error:', error);
-    return errorResponse('INTERNAL_ERROR', 'Internal server error', 400);
+    console.error("[PUT /meal-foods] Error:", error);
+    return errorResponse("INTERNAL_ERROR", "Internal server error", 400);
   }
 }
 
@@ -404,44 +432,56 @@ async function handleDELETE(req: NextRequest) {
     const { ids } = body;
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return errorResponse('VALIDATION_ERROR', 'Missing or invalid ids array', 400);
+      return errorResponse(
+        "VALIDATION_ERROR",
+        "Missing or invalid ids array",
+        400,
+      );
     }
 
     // Verify ownership: All meal_detail_ids must belong to user's meals
     const { data: mealDetails, error: fetchError } = await supabase
-      .from('user_meal_details')
-      .select('meal_id')
-      .in('meal_detail_id', ids);
+      .from("user_meal_details")
+      .select("meal_id")
+      .in("meal_detail_id", ids);
 
     if (fetchError || !mealDetails) {
-      return errorResponse('DATABASE_ERROR', 'Failed to verify ownership', 400);
+      return errorResponse("DATABASE_ERROR", "Failed to verify ownership", 400);
     }
 
     const mealIds = mealDetails.map((md: any) => md.meal_id);
 
     const { data: meals, error: mealsError } = await supabase
-      .from('user_meals')
-      .select('user_id')
-      .in('meal_id', mealIds);
+      .from("user_meals")
+      .select("user_id")
+      .in("meal_id", mealIds);
 
-    if (mealsError || !meals || !meals.every((m: any) => m.user_id === user!.userId)) {
-      return errorResponse('ACCESS_DENIED', 'Insufficient permissions', 403);
+    if (
+      mealsError ||
+      !meals ||
+      !meals.every((m: any) => m.user_id === user!.userId)
+    ) {
+      return errorResponse("ACCESS_DENIED", "Insufficient permissions", 403);
     }
 
     // Delete meal foods
     const { error: deleteError } = await supabase
-      .from('user_meal_details')
+      .from("user_meal_details")
       .delete()
-      .in('meal_detail_id', ids);
+      .in("meal_detail_id", ids);
 
     if (deleteError) {
-      return errorResponse('DATABASE_ERROR', 'Failed to delete meal foods', 400);
+      return errorResponse(
+        "DATABASE_ERROR",
+        "Failed to delete meal foods",
+        400,
+      );
     }
 
     return successResponse({ deleted: ids.length });
   } catch (error) {
-    console.error('[DELETE /meal-foods] Error:', error);
-    return errorResponse('INTERNAL_ERROR', 'Internal server error', 400);
+    console.error("[DELETE /meal-foods] Error:", error);
+    return errorResponse("INTERNAL_ERROR", "Internal server error", 400);
   }
 }
 
