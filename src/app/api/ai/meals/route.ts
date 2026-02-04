@@ -1,6 +1,6 @@
-import { NextRequest } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import { authenticate, errorResponse, successResponse } from '../utils';
+import { NextRequest } from "next/server";
+import { supabase } from "@/lib/supabase";
+import { authenticate, errorResponse, successResponse } from "../utils";
 
 /**
  * @swagger
@@ -70,28 +70,30 @@ async function handleGET(req: NextRequest) {
   if (error) return error;
 
   const { searchParams } = new URL(req.url);
-  const date = searchParams.get('date');
+  const date = searchParams.get("date");
 
   try {
     let query = supabase
-      .from('user_meals')
-      .select('*')
-      .eq('user_id', user!.userId);
+      .from("user_meals")
+      .select("*")
+      .eq("user_id", user!.userId);
 
     if (date) {
-      query = query.eq('log_date', date);
+      query = query.eq("log_date", date);
     }
 
-    const { data, error: dbError } = await query.order('log_date', { ascending: false });
+    const { data, error: dbError } = await query.order("log_date", {
+      ascending: false,
+    });
 
     if (dbError) {
-      return errorResponse('DATABASE_ERROR', 'Failed to fetch meals', 400);
+      return errorResponse("DATABASE_ERROR", "Failed to fetch meals", 400);
     }
 
     return successResponse(data || []);
   } catch (error) {
-    console.error('[GET /meals] Error:', error);
-    return errorResponse('INTERNAL_ERROR', 'Internal server error', 400);
+    console.error("[GET /meals] Error:", error);
+    return errorResponse("INTERNAL_ERROR", "Internal server error", 400);
   }
 }
 
@@ -110,7 +112,7 @@ async function handleGET(req: NextRequest) {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [meal_type, log_date]
+ *             required: [type, date]
  *             properties:
  *               meal_type:
  *                 type: string
@@ -136,6 +138,15 @@ async function handleGET(req: NextRequest) {
  *                     meal_id:
  *                       type: integer
  *                       example: 300
+ *                     user_id:
+ *                       type: integer          
+ *                       example: 1
+ *                    meal_type:
+ *                      type: string
+ *                      example: "Lunch"
+ *                    log_date:
+ *                      type: string
+ *                      format: "2026-02-25"
  *       400:
  *         description: Validation error
  *         content:
@@ -169,41 +180,81 @@ async function handleGET(req: NextRequest) {
  *                   type: string
  *                   example: "Missing or invalid authorization token"
  */
+function getToday(): string {
+  return new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+}
+function isValidDateFormat(date: string): boolean {
+  // format check
+  const regex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!regex.test(date)) return false;
+
+  // real date check (2026-02-31 should fail)
+  const d = new Date(date);
+  return !isNaN(d.getTime()) && d.toISOString().startsWith(date);
+}
 async function handlePOST(req: NextRequest) {
   const { user, error } = authenticate(req);
   if (error) return error;
 
   try {
     const body = await req.json();
-    const { meal_type, log_date } = body;
+    let { date, type } = body;
 
-    if (!meal_type || !log_date) {
-      return errorResponse(
-        'VALIDATION_ERROR',
-        'Missing required fields: meal_type, log_date',
-        400
+    if  (!type) {
+      return Response.json(
+        { success: false, message: "Missing type"},
+        { status: 400 }
+      );
+    }
+    let hasDate = 1;
+    // default to today if missing
+    if (!date) {
+      date = getToday();
+      hasDate = 0;
+    }
+    
+    // validate if provided
+    if (!isValidDateFormat(date)) {
+      return Response.json(
+        { success: false, message: "Invalid log_date. Use YYYY-MM-DD" },
+        { status: 400 },
       );
     }
 
-    // Insert new meal
-    const { data, error: insertError } = await supabase
-      .from('user_meals')
+    const { error: insertError } = await supabase
+      .from("user_meals")
       .insert({
-        user_id: user!.userId,
-        meal_type,
-        log_date,
-      })
-      .select('meal_id')
-      .single();
+        meal_type: type,
+        user_id: user.userId,
+        log_date: date,
+      });
 
-    if (insertError || !data) {
-      return errorResponse('DATABASE_ERROR', 'Failed to create meal', 400);
+    if (insertError) {
+      return errorResponse("DATABASE_ERROR", "Failed to create meal", 400);
+    } 
+
+
+    let query = supabase
+      .from("user_meals")
+      .select("*")
+      .eq("user_id", user.userId);
+
+    if (hasDate === 1) {
+      query = query.eq("log_date", date);
     }
 
-    return successResponse(data, 201);
+    const { data: meals, error: fetchError } = await query.order("log_date", {
+      ascending: false,
+    });
+
+    if (fetchError) {
+      return errorResponse("DATABASE_ERROR", "Failed to fetch meals", 400);
+    }
+
+    return successResponse(meals || []);
+
   } catch (error) {
-    console.error('[POST /meals] Error:', error);
-    return errorResponse('INTERNAL_ERROR', 'Internal server error', 400);
+    return errorResponse("INTERNAL_ERROR", "Internal server error", 400);
   }
 }
 

@@ -105,7 +105,7 @@ async function handlePOST(req: NextRequest) {
 
     if (!meal_id || !food_id || numbers_of_serving === undefined) {
       return errorResponse(
-        'VALIDATION_ERROR',
+        'VALIDATION_ERROR',                                                     
         'Missing required fields: meal_id, food_id, numbers_of_serving',
         400
       );
