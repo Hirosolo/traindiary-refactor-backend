@@ -7,7 +7,7 @@ export interface Food {
   protein_per_serving: number;
   carbs_per_serving: number;
   fat_per_serving: number;
-  serving_type: string;
+  unit_type: string;
   image?: string;
 }
 

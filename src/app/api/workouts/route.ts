@@ -220,7 +220,7 @@
  *   delete:
  *     summary: Delete a session detail
  *     description: Delete a specific session detail (exercise) from a workout session using session_detail_id
- *     tags: [Session details]
+ *     tags: [Sesssions details]
  *     security:
  *       - bearerAuth: []
  *     requestBody:

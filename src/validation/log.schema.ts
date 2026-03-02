@@ -2,11 +2,7 @@ import { z } from 'zod';
 
 export const mealDetailSchema = z.object({
   food_id: z.number().int(),
-  numbers_of_serving: z.number().min(0).optional(),
-  amount_grams: z.number().min(0).optional(),
-}).refine(data => data.numbers_of_serving !== undefined || data.amount_grams !== undefined, {
-  message: "Either numbers_of_serving or amount_grams must be provided",
-  path: ["numbers_of_serving"]
+  numbers_of_serving: z.number().min(0).default(1),
 });
 
 export const requestMealSchema = z.object({

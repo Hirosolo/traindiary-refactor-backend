@@ -6,7 +6,7 @@ export const foodSchema = z.object({
   protein_per_serving: z.number().min(0),
   carbs_per_serving: z.number().min(0),
   fat_per_serving: z.number().min(0),
-  serving_type: z.string().min(1, 'Serving type is required'),
+  unit_type: z.string().min(1, 'Unit type is required'),
   image: z.string().optional().nullable(),
   fibers_per_serving: z.number().min(0).optional().nullable(),
   sugars_per_serving: z.number().min(0).optional().nullable(),

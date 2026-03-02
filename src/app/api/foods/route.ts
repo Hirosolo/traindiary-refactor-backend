@@ -54,9 +54,9 @@
  *                       fat_per_serving:
  *                         type: number
  *                         example: 50
- *                       serving_type:
+ *                       unit_type:
  *                         type: string
- *                         example: 100 g
+ *                         example: g
  *                       image:
  *                         type: string
  *                         nullable: true
@@ -118,7 +118,7 @@
  *         application/json:
  *           schema:
  *             type: object
- *             required: [name, calories_per_serving, protein_per_serving, carbs_per_serving, fat_per_serving, serving_type]
+ *             required: [name, calories_per_serving, protein_per_serving, carbs_per_serving, fat_per_serving, unit_type]
  *             properties:
  *               name:
  *                 type: string
@@ -135,9 +135,9 @@
  *               fat_per_serving:
  *                 type: number
  *                 example: 50
- *               serving_type:
+ *               unit_type:
  *                 type: string
- *                 example: 100 g
+ *                 example: g
  *               image:
  *                 type: string
  *                 nullable: true

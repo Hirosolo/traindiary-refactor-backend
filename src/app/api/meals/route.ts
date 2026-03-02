@@ -109,11 +109,13 @@
  *                 type: array
  *                 items:
  *                   type: object
+ *                   required: [food_id, numbers_of_serving]
  *                   properties:
  *                     food_id:
  *                       type: integer
  *                     numbers_of_serving:
  *                       type: number
+ *                       description: Number of units (multiplier for nutrient_per_unit values)
  *     responses:
  *       201:
  *         description: Meal logged

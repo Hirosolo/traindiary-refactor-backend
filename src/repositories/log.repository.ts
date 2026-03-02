@@ -228,7 +228,7 @@ export const MealRepository = {
           food:foods(
             food_id,
             name,
-            serving_type,
+            unit_type,
             image,
             calories_per_serving,
             protein_per_serving,
@@ -267,7 +267,7 @@ export const MealRepository = {
         meal_detail_id: detail.meal_detail_id,
         food_id: food?.food_id,
         food_name: food?.name,
-        serving_type: food?.serving_type,
+        unit_type: food?.unit_type,
         image: food?.image,
         numbers_of_serving: servings,
         total_calories: Math.round((food?.calories_per_serving || 0) * servings * 100) / 100,
@@ -311,7 +311,7 @@ export const MealRepository = {
     const mealDetails = details.map((d: any) => ({
       meal_id: meal.meal_id,
       food_id: d.food_id,
-      numbers_of_serving: d.amount_grams || d.numbers_of_serving
+      numbers_of_serving: d.numbers_of_serving ?? 1
     }));
 
     const { error: detailsError } = await supabase
