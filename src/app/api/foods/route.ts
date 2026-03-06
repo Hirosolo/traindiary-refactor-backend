@@ -197,12 +197,18 @@ import { successResponse, errorResponse } from '@/lib/response';
 import { fromZodError } from 'zod-validation-error';
 import { getAuthUser } from '@/lib/auth';
 
-function getTodayVersion(): string {
-  const now = new Date();
-  const dd = String(now.getDate()).padStart(2, '0');
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const yyyy = String(now.getFullYear());
+function formatDateToDDMMYYYY(date: Date): string {
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(date.getFullYear());
   return `${dd}${mm}${yyyy}`;
+}
+
+function parseDDMMYYYY(version: string): Date {
+  const day = parseInt(version.substring(0, 2));
+  const month = parseInt(version.substring(2, 4)) - 1;
+  const year = parseInt(version.substring(4, 8));
+  return new Date(year, month, day);
 }
 
 export async function GET(req: NextRequest) {
@@ -211,7 +217,6 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search') || undefined;
     const clientVersion = searchParams.get('version');
 
-    // If searching by keyword, bypass version control and return results directly
     if (search) {
       const foods = await FoodRepository.findAll(search);
       if (!foods || foods.length === 0) {
@@ -220,16 +225,31 @@ export async function GET(req: NextRequest) {
       return successResponse(foods, 'Success', 200);
     }
 
-    const todayVersion = getTodayVersion();
+    const latestUpdateStr = await FoodRepository.getLatestUpdate();
+    const latestUpdate = latestUpdateStr ? new Date(latestUpdateStr) : new Date(0);
+    const todayVersion = formatDateToDDMMYYYY(latestUpdate);
 
-    // Client version matches today → data has not changed
+    // If no version provided, return all data
+    if (!clientVersion) {
+      const foods = await FoodRepository.findAll();
+      return successResponse({ changed: 1, version: todayVersion, data: foods }, 'Full data load', 200);
+    }
+
+    // Client version matches latest → no change
     if (clientVersion === todayVersion) {
       return successResponse({ changed: 0, version: todayVersion }, 'Data not changed', 200);
     }
 
-    // Version is outdated or missing → return fresh data
-    const foods = await FoodRepository.findAll();
-    return successResponse({ changed: 1, version: todayVersion, data: foods }, 'Data updated', 200);
+    // Incremental sync: fetch rows updated since the start of the client's version day
+    const sinceDate = parseDDMMYYYY(clientVersion);
+    const updates = await FoodRepository.findUpdatedSince(sinceDate.toISOString());
+
+    return successResponse({ 
+      changed: updates.length > 0 ? 1 : 0, 
+      version: todayVersion, 
+      data: updates 
+    }, updates.length > 0 ? 'Incremental update' : 'No new updates', 200);
+
   } catch (error: any) {
     return errorResponse(error.message, 500);
   }

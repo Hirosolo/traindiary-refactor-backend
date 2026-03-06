@@ -9,6 +9,7 @@ export interface Food {
   fat_per_serving: number;
   unit_type: string;
   image?: string;
+  updated_at: string;
 }
 
 export const FoodRepository = {
@@ -63,6 +64,29 @@ export const FoodRepository = {
     return data || null;
   },
 
+  async findUpdatedSince(since: string): Promise<Food[]> {
+    const { data, error } = await supabase
+      .from("foods")
+      .select("*")
+      .gt("updated_at", since)
+      .order("updated_at", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+
+  async getLatestUpdate(): Promise<string | null> {
+    const { data, error } = await supabase
+      .from("foods")
+      .select("updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error && error.code !== "PGRST116") throw new Error(error.message);
+    return data?.updated_at || null;
+  },
+
   async delete(id: number): Promise<boolean> {
     const { error } = await supabase.from("foods").delete().eq("food_id", id);
 
@@ -78,6 +102,7 @@ export interface Exercise {
   default_sets: number;
   default_reps: number;
   description: string;
+  updated_at: string;
 }
 
 export const ExerciseRepository = {
@@ -134,6 +159,29 @@ export const ExerciseRepository = {
 
     if (error) throw new Error(error.message);
     return data || null;
+  },
+
+  async findUpdatedSince(since: string): Promise<Exercise[]> {
+    const { data, error } = await supabase
+      .from("exercises")
+      .select("*")
+      .gt("updated_at", since)
+      .order("updated_at", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+
+  async getLatestUpdate(): Promise<string | null> {
+    const { data, error } = await supabase
+      .from("exercises")
+      .select("updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error && error.code !== "PGRST116") throw new Error(error.message);
+    return data?.updated_at || null;
   },
 
   async delete(id: number): Promise<boolean> {
