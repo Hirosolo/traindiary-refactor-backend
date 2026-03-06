@@ -197,18 +197,39 @@ import { successResponse, errorResponse } from '@/lib/response';
 import { fromZodError } from 'zod-validation-error';
 import { getAuthUser } from '@/lib/auth';
 
+function getTodayVersion(): string {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(now.getFullYear());
+  return `${dd}${mm}${yyyy}`;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
     const search = searchParams.get('search') || undefined;
+    const clientVersion = searchParams.get('version');
 
-    const foods = await FoodRepository.findAll(search);
-    
-    if (search && (!foods || foods.length === 0)) {
-      return errorResponse('not found any food math with the keyword', 404);
+    // If searching by keyword, bypass version control and return results directly
+    if (search) {
+      const foods = await FoodRepository.findAll(search);
+      if (!foods || foods.length === 0) {
+        return errorResponse('not found any food match with the keyword', 404);
+      }
+      return successResponse(foods, 'Success', 200);
     }
-    
-    return successResponse(foods, 'Success', 200);
+
+    const todayVersion = getTodayVersion();
+
+    // Client version matches today → data has not changed
+    if (clientVersion === todayVersion) {
+      return successResponse({ changed: 0, version: todayVersion }, 'Data not changed', 200);
+    }
+
+    // Version is outdated or missing → return fresh data
+    const foods = await FoodRepository.findAll();
+    return successResponse({ changed: 1, version: todayVersion, data: foods }, 'Data updated', 200);
   } catch (error: any) {
     return errorResponse(error.message, 500);
   }

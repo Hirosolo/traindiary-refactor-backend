@@ -164,22 +164,39 @@ import { successResponse, errorResponse } from '@/lib/response';
 import { fromZodError } from 'zod-validation-error';
 import { getAuthUser } from '@/lib/auth';
 
+function getTodayVersion(): string {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(now.getFullYear());
+  return `${dd}${mm}${yyyy}`;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
     const name = searchParams.get('name');
+    const clientVersion = searchParams.get('version');
 
-    let exercises;
+    // If searching by name, bypass version control and return results directly
     if (name) {
-      exercises = await ExerciseRepository.findByName(name);
+      const exercises = await ExerciseRepository.findByName(name);
       if (!exercises || exercises.length === 0) {
-        return errorResponse('Fot found exercise with those keyword', 404);
+        return errorResponse('Not found exercise with those keyword', 404);
       }
-    } else {
-      exercises = await ExerciseRepository.findAll();
+      return successResponse(exercises, 'Success', 200);
     }
 
-    return successResponse(exercises, 'Success', 200);
+    const todayVersion = getTodayVersion();
+
+    // Client version matches today → data has not changed
+    if (clientVersion === todayVersion) {
+      return successResponse({ changed: 0, version: todayVersion }, 'Data not changed', 200);
+    }
+
+    // Version is outdated or missing → return fresh data
+    const exercises = await ExerciseRepository.findAll();
+    return successResponse({ changed: 1, version: todayVersion, data: exercises }, 'Data updated', 200);
   } catch (error: any) {
     return errorResponse(error.message, 500);
   }
