@@ -352,6 +352,49 @@ export const MealRepository = {
 };
 
 export const WorkoutRepository = {
+  async getPRs(userId: number, exerciseIds: number[]): Promise<Map<number, any>> {
+    if (exerciseIds.length === 0) return new Map();
+    const { data, error } = await supabase
+      .from('personal_records')
+      .select('*')
+      .eq('user_id', userId)
+      .in('exercise_id', exerciseIds);
+
+    if (error) throw new Error(error.message);
+    const map = new Map();
+    (data || []).forEach(pr => map.set(pr.exercise_id, pr));
+    return map;
+  },
+
+  async updatePR(userId: number, exerciseId: number, weight: number, reps: number) {
+    if (!weight || !reps) return;
+    
+    // We update PR if weight is higher, or if weight is same but reps are higher
+    const { data: currentPR } = await supabase
+      .from('personal_records')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('exercise_id', exerciseId)
+      .maybeSingle();
+
+    const isNewRecord = !currentPR || 
+      weight > currentPR.weight_kg || 
+      (weight === currentPR.weight_kg && reps > (currentPR.reps || 0));
+
+    if (isNewRecord) {
+      if (currentPR) {
+        await supabase
+          .from('personal_records')
+          .update({ weight_kg: weight, reps: reps, achieved_at: new Date().toISOString() })
+          .eq('record_id', currentPR.record_id);
+      } else {
+        await supabase
+          .from('personal_records')
+          .insert([{ user_id: userId, exercise_id: exerciseId, weight_kg: weight, reps: reps }]);
+      }
+    }
+  },
+
   async findByUserId(userId: number, filters: { month?: string, date?: string } = {}): Promise<any[]> {
     let query = supabase
       .from('workout_sessions')
@@ -389,7 +432,20 @@ export const WorkoutRepository = {
     
     const { data, error } = await query;
     if (error) throw new Error(error.message);
-    return data || [];
+    
+    const sessions = data || [];
+    
+    // Fetch PRs for all exercises in these sessions
+    const exerciseIds = new Set<number>();
+    sessions.forEach((s: any) => s.session_details?.forEach((d: any) => { if (d.exercise_id) exerciseIds.add(d.exercise_id); }));
+    const prMap = await this.getPRs(userId, Array.from(exerciseIds));
+
+    // Attach PR to session details
+    sessions.forEach((s: any) => s.session_details?.forEach((d: any) => {
+      d.personal_record = prMap.get(d.exercise_id) || null;
+    }));
+
+    return sessions;
   },
 
   async create(userId: number, workoutData: any): Promise<any> {
@@ -451,9 +507,13 @@ export const WorkoutRepository = {
     }
 
     const exerciseTypeMap = await buildExerciseTypeMap(Array.from(exerciseMap.keys()));
+    const prMap = await this.getPRs(userId, Array.from(exerciseMap.keys()));
 
     // Now create ONE session_detail per unique exercise
     for (const [exerciseId, allSets] of exerciseMap.entries()) {
+      const pr = prMap.get(exerciseId);
+      const defaultWeight = pr?.weight_kg || 0;
+      const defaultReps = pr?.reps || 10;
       const { data: detail, error: detailError } = await supabase
         .from('session_details')
         .insert([{ 
@@ -472,9 +532,9 @@ export const WorkoutRepository = {
         const durationMinutes = s.duration ?? (s.duration_seconds ? Math.round(s.duration_seconds / 60) : 0);
         return {
           session_detail_id: detail.session_detail_id,
-          reps: isCardio ? 0 : (s.actual_reps || s.reps || 0),
+          reps: isCardio ? 0 : (s.actual_reps || s.reps || defaultReps),
           duration: isCardio ? durationMinutes : 0,
-          weight_kg: isCardio ? 0 : (s.weight_kg || s.weight || 0),
+          weight_kg: isCardio ? 0 : (s.weight_kg || s.weight || defaultWeight),
           status: s.status ? 'COMPLETED' : 'UNFINISHED',
           notes: s.notes || null
         };
@@ -559,6 +619,17 @@ export const WorkoutRepository = {
       .single();
     if (error) throw new Error(error.message);
 
+    // Update PR if completed
+    if (updateData.status === 'COMPLETED' || data.status === 'COMPLETED') {
+      const { data: detail } = await supabase.from('session_details').select('exercise_id, session_id').eq('session_detail_id', sessionDetailId).single();
+      if (detail) {
+        const { data: session } = await supabase.from('workout_sessions').select('user_id').eq('session_id', detail.session_id).single();
+        if (session) {
+          await this.updatePR(session.user_id, detail.exercise_id, data.weight_kg, data.reps);
+        }
+      }
+    }
+
     return data;
   },
 
@@ -591,6 +662,17 @@ export const WorkoutRepository = {
       .select()
       .single();
     if (error) throw new Error(error.message);
+
+    // Update PR if completed
+    if (status === 'COMPLETED') {
+        const { data: detail } = await supabase.from('session_details').select('exercise_id, session_id').eq('session_detail_id', sessionDetailId).single();
+        if (detail) {
+            const { data: session } = await supabase.from('workout_sessions').select('user_id').eq('session_id', detail.session_id).single();
+            if (session) {
+                await this.updatePR(session.user_id, detail.exercise_id, data.weight_kg, data.reps);
+            }
+        }
+    }
 
     return data;
   },
@@ -807,6 +889,21 @@ export const WorkoutRepository = {
         .select();
       if (updateError) throw new Error(updateError.message);
       if (updateData) results.push(...updateData);
+    }
+
+    // Update PRs for all completed logs in this batch
+    const completedLogs = results.filter(r => r.status === 'COMPLETED');
+    if (completedLogs.length > 0) {
+        const detailIds = Array.from(new Set(completedLogs.map(l => l.session_detail_id)));
+        const { data: details } = await supabase.from('session_details').select('session_detail_id, exercise_id').in('session_detail_id', detailIds);
+        const detailToEx = new Map(details?.map(d => [d.session_detail_id, d.exercise_id]));
+        
+        for (const log of completedLogs) {
+            const exId = detailToEx.get(log.session_detail_id);
+            if (exId) {
+                await this.updatePR(userId, exId, log.weight_kg, log.reps);
+            }
+        }
     }
 
     return results;

@@ -198,7 +198,10 @@ export async function GET(req: NextRequest) {
 
     // If no version provided, return all data
     if (!clientVersion) {
-      const exercises = await ExerciseRepository.findAll();
+      const user = getAuthUser(req);
+      const exercises = user 
+        ? await ExerciseRepository.findAllWithPR(user.userId)
+        : await ExerciseRepository.findAll();
       return successResponse({ changed: 1, version: todayVersion, data: exercises }, 'Full data load', 200);
     }
 

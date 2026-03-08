@@ -116,6 +116,20 @@ export const ExerciseRepository = {
     return data || [];
   },
 
+  async findAllWithPR(userId: number): Promise<any[]> {
+    const { data, error } = await supabase
+      .from("exercises")
+      .select(`
+        *,
+        personal_records:personal_records(*)
+      `)
+      .eq("personal_records.user_id", userId)
+      .order("name", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+
   async findByName(searchQuery: string): Promise<Exercise[]> {
     const { data, error } = await supabase
       .from("exercises")
