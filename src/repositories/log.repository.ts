@@ -682,5 +682,73 @@ export const WorkoutRepository = {
 
   async deleteSessionDetailById(sessionDetailId: number, userId?: number): Promise<boolean> {
     return deleteSessionDetailById(sessionDetailId, userId);
+  },
+
+  async upsertLogs(logs: any[], userId: number): Promise<any[]> {
+    if (logs.length === 0) return [];
+
+    // 1. Identify all unique session_detail_ids for ownership check
+    const sessionDetailIds = Array.from(new Set(logs.map(log => log.session_detail_id).filter(Boolean)));
+    for (const sid of sessionDetailIds) {
+      await ensureSessionDetailOwnedByUser(sid as number, userId);
+    }
+
+    // 2. We also need to check for logs that have set_id but are missing session_detail_id
+    // to ensure they are owned by the user.
+    const logsWithSetId = logs.filter(l => l.set_id && !l.session_detail_id);
+    for (const log of logsWithSetId) {
+      const sid = await getSessionDetailIdBySetId(log.set_id);
+      await ensureSessionDetailOwnedByUser(sid, userId);
+    }
+
+    // 3. Determine which session details are cardio
+    const cardioMap = new Map<number, boolean>();
+    const allSessionDetailIds = Array.from(new Set([
+      ...sessionDetailIds,
+      ...(await Promise.all(logsWithSetId.map(l => getSessionDetailIdBySetId(l.set_id))))
+    ]));
+
+    for (const sid of allSessionDetailIds) {
+      cardioMap.set(sid as number, await isCardioBySessionDetailId(sid as number));
+    }
+
+    // 4. Prepare data for upsert
+    const upsertData = await Promise.all(logs.map(async (log) => {
+      let sid = log.session_detail_id;
+      if (!sid && log.set_id) {
+        sid = await getSessionDetailIdBySetId(log.set_id);
+      }
+
+      const isCardio = cardioMap.get(sid);
+      
+      let status = 'UNFINISHED';
+      if (log.status !== undefined) {
+        if (typeof log.status === 'boolean') {
+          status = log.status ? 'COMPLETED' : 'UNFINISHED';
+        } else {
+          status = log.status;
+        }
+      }
+
+      const durationMinutes = log.duration ?? log.actual_duration ?? (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0);
+
+      return {
+        set_id: log.set_id, // Supabase will use this for matching
+        session_detail_id: sid,
+        reps: isCardio ? 0 : (log.actual_reps ?? log.reps ?? 0),
+        duration: isCardio ? durationMinutes : 0,
+        weight_kg: isCardio ? 0 : (log.weight_kg ?? 0),
+        status: status,
+        notes: log.notes ?? null,
+      };
+    }));
+
+    const { data, error } = await supabase
+      .from('sessions_exercise_details')
+      .upsert(upsertData)
+      .select();
+
+    if (error) throw new Error(error.message);
+    return data || [];
   }
 };
