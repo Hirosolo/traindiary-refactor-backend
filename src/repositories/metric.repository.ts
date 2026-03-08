@@ -15,9 +15,11 @@ export interface UserMetric {
 
 export const MetricRepository = {
   async addMetric(metric: UserMetric): Promise<any> {
+    const { metric_id, recorded_at, ...insertData } = metric;
+    
     const { data, error } = await supabase
       .from('user_metrics')
-      .insert([metric])
+      .insert([insertData])
       .select()
       .single();
 

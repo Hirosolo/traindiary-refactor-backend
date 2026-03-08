@@ -21,7 +21,7 @@ export interface NutritionGoal {
 
 export const NutritionRepository = {
   async upsertGoal(goalData: NutritionGoal): Promise<any> {
-    const { user_id, start_date, ...targets } = goalData;
+    const { goal_id, user_id, start_date, ...targets } = goalData;
     
     // First check if a goal for this (user_id, start_date) already exists.
     // However, user said "Max 1 goal per day. Changes apply from then on."
