@@ -10,6 +10,13 @@ export interface NutritionGoal {
   fiber_target_g: number;
   hydration_target_ml: number;
   start_date: string;
+  goal_type?: 'cutting' | 'lean_bulk' | 'maintain' | 'recomposition';
+  goal_speed?: 'slow' | 'moderate' | 'aggressive';
+  bmr?: number;
+  tdee?: number;
+  target_weight_kg?: number;
+  workout_days_per_week?: number;
+  workout_type?: string;
 }
 
 export const NutritionRepository = {
