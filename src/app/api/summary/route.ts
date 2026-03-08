@@ -21,10 +21,16 @@ export async function GET(req: NextRequest) {
     if (!user) return errorResponse('Unauthorized', 401);
 
     const searchParams = req.nextUrl.searchParams;
-    const periodType = (searchParams.get('period_type') as 'weekly' | 'monthly') || 'weekly';
-    const periodStart = searchParams.get('period_start') || undefined;
+    let periodType = (searchParams.get('period_type') as 'weekly' | 'monthly') || 'weekly';
+    let periodStart = searchParams.get('period_start') || undefined;
 
-    const summary = await ProgressRepository.getSummary(user.userId, periodType === 'weekly' ? 'weekly' : 'monthly', periodStart);
+    const monthParam = searchParams.get('month');
+    if (monthParam) {
+      periodType = 'monthly';
+      periodStart = `${monthParam}-01`;
+    }
+
+    const summary = await ProgressRepository.getSummary(user.userId, periodType, periodStart);
     
     return successResponse(summary);
   } catch (error: any) {

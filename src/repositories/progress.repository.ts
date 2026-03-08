@@ -42,7 +42,7 @@ export const ProgressRepository = {
         gr_score,
         details:session_details(
           logs:sessions_exercise_details(reps, weight_kg),
-          exercise:exercises(category, difficulty_factor)
+          exercise:exercises(name, category, difficulty_factor)
         )
       `)
       .eq('user_id', userId)
@@ -93,9 +93,10 @@ export const ProgressRepository = {
       .from('user_meals')
       .select(`
         meal_id,
+        log_date,
         details:user_meal_details(
           numbers_of_serving,
-          food:foods(calories_per_serving, protein_per_serving, carbs_per_serving, fat_per_serving, fibers_per_serving)
+          food:foods(calories_per_serving, protein_per_serving, carbs_per_serving, fat_per_serving, fibers_per_serving, sugars_per_serving)
         )
       `)
       .eq('user_id', userId)
@@ -108,13 +109,26 @@ export const ProgressRepository = {
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
 
+    // Daily Summary Map
+    const dailyMap = new Map<string, any>();
+    const exerciseMap: Record<string, { name: string, count: number, volume: number }> = {};
+
     // Calculate total volume and gr_score
     let totalGrScore = 0;
     let totalVolume = 0;
     const muscleGroups: Record<string, number> = {};
 
     workouts?.forEach(w => {
+      const date = w.scheduled_date;
+      if (!dailyMap.has(date)) {
+        dailyMap.set(date, { date, workouts: 0, kcal: 0, protein: 0, carbs: 0, fats: 0, fiber: 0, sugar: 0, gr: 0 });
+      }
+      const dayData = dailyMap.get(date);
+
       if (w.status === 'COMPLETED') {
+        dayData.workouts = 1;
+        dayData.gr = w.gr_score || 0;
+
         if (w.gr_score) {
           totalGrScore += w.gr_score;
         }
@@ -122,6 +136,11 @@ export const ProgressRepository = {
         w.details?.forEach((d: any) => {
           const category = d.exercise?.category || 'Other';
           const difficulty = d.exercise?.difficulty_factor || 1.0;
+          const exerciseName = d.exercise?.name || 'Unknown';
+
+          if (!exerciseMap[exerciseName]) {
+            exerciseMap[exerciseName] = { name: exerciseName, count: 0, volume: 0 };
+          }
           
           let detailForce = 0;
           d.logs?.forEach((l: any) => {
@@ -131,6 +150,9 @@ export const ProgressRepository = {
             const volume = reps * effectiveWeight;
             totalVolume += volume;
             detailForce += volume * difficulty;
+
+            exerciseMap[exerciseName].count += 1;
+            exerciseMap[exerciseName].volume += volume;
           });
 
           muscleGroups[category] = (muscleGroups[category] || 0) + detailForce;
@@ -161,14 +183,34 @@ export const ProgressRepository = {
 
     let totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0, totalFiber = 0;
     meals?.forEach(m => {
+      const date = m.log_date;
+      if (!dailyMap.has(date)) {
+        dailyMap.set(date, { date, workouts: 0, kcal: 0, protein: 0, carbs: 0, fats: 0, fiber: 0, sugar: 0, gr: 0 });
+      }
+      const dayData = dailyMap.get(date);
+
       m.details?.forEach((d: any) => {
         const food = d.food;
         const servings = d.numbers_of_serving || 0;
-        totalCalories += (food.calories_per_serving || 0) * servings;
-        totalProtein += (food.protein_per_serving || 0) * servings;
-        totalCarbs += (food.carbs_per_serving || 0) * servings;
-        totalFat += (food.fat_per_serving || 0) * servings;
-        totalFiber += (food.fibers_per_serving || 0) * servings;
+        const kcal = (food.calories_per_serving || 0) * servings;
+        const protein = (food.protein_per_serving || 0) * servings;
+        const carbs = (food.carbs_per_serving || 0) * servings;
+        const fat = (food.fat_per_serving || 0) * servings;
+        const fiber = (food.fibers_per_serving || 0) * servings;
+        const sugar = (food.sugars_per_serving || 0) * servings;
+
+        totalCalories += kcal;
+        totalProtein += protein;
+        totalCarbs += carbs;
+        totalFat += fat;
+        totalFiber += fiber;
+
+        dayData.kcal += kcal;
+        dayData.protein += protein;
+        dayData.carbs += carbs;
+        dayData.fats += fat;
+        dayData.fiber += fiber;
+        dayData.sugar += sugar;
       });
     });
 
@@ -176,6 +218,9 @@ export const ProgressRepository = {
       total_workouts: workouts?.filter((w: any) => w.status === 'COMPLETED').length || 0,
       total_volume: Math.round(totalVolume),
       gr_score: Math.round(totalGrScore),
+      gr_avg: workouts?.filter((w: any) => w.status === 'COMPLETED').length > 0 
+        ? Math.round(totalGrScore / workouts.filter((w: any) => w.status === 'COMPLETED').length) 
+        : 0,
       gr_score_change: grScoreChange,
       longest_streak: longestStreak,
       muscle_split: muscleSplit,
@@ -183,7 +228,9 @@ export const ProgressRepository = {
       protein_avg: Math.round(totalProtein / diffDays),
       carbs_avg: Math.round(totalCarbs / diffDays),
       fats_avg: Math.round(totalFat / diffDays),
-      fiber_avg: Math.round(totalFiber / diffDays)
+      fiber_avg: Math.round(totalFiber / diffDays),
+      daily_data: Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
+      exercise_data: Object.values(exerciseMap)
     };
   }
 };
