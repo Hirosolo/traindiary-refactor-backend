@@ -1,35 +1,20 @@
 import { supabase } from '@/lib/supabase';
 
 export const ProgressRepository = {
-  async getSummary(userId: number, period: 'weekly' | 'monthly', explicitStartDate?: string): Promise<any> {
-    let startDateStr = explicitStartDate;
-    
-    if (!startDateStr) {
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - (period === 'weekly' ? 7 : 30));
-      startDateStr = startDate.toISOString().split('T')[0];
-    }
+  async getSummary(userId: number, explicitStartDate: string): Promise<any> {
+    const startDate = new Date(explicitStartDate);
+    const startDateStr = startDate.toISOString().split('T')[0];
 
-    // Calculate end date for current period
-    const startDate = new Date(startDateStr);
+    // Calculate end date (1st of next month)
     const endDate = new Date(startDate);
-    if (period === 'monthly') {
-      // Set to 1st of next month
-      endDate.setMonth(endDate.getMonth() + 1);
-      endDate.setDate(1);
-    } else {
-      endDate.setDate(endDate.getDate() + 7);
-    }
+    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setDate(1);
     const endDateStr = endDate.toISOString().split('T')[0];
 
-    // Calculate previous period dates for comparison
+    // Calculate previous period dates (1st of previous month)
     const prevStartDate = new Date(startDate);
-    if (period === 'monthly') {
-      prevStartDate.setMonth(prevStartDate.getMonth() - 1);
-      prevStartDate.setDate(1);
-    } else {
-      prevStartDate.setDate(prevStartDate.getDate() - 7);
-    }
+    prevStartDate.setMonth(prevStartDate.getMonth() - 1);
+    prevStartDate.setDate(1);
     const prevStartDateStr = prevStartDate.toISOString().split('T')[0];
 
     // Get workouts in current period
