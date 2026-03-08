@@ -90,6 +90,22 @@ const ensureSessionDetailOwnedByUser = async (sessionDetailId: number, userId?: 
   }
 };
 
+const ensureSessionOwnedByUser = async (sessionId: number, userId?: number) => {
+  if (!userId) return;
+
+  const { data: session, error: sessionError } = await supabase
+    .from('workout_sessions')
+    .select('user_id')
+    .eq('session_id', sessionId)
+    .single();
+
+  if (sessionError) throw new Error(sessionError.message);
+
+  if (session.user_id !== userId) {
+    throw new Error('UNAUTHORIZED');
+  }
+};
+
 const getSessionDetailIdBySetId = async (setId: number): Promise<number> => {
   const { data, error } = await supabase
     .from('sessions_exercise_details')
@@ -341,10 +357,10 @@ export const WorkoutRepository = {
       .from('workout_sessions')
       .select(`
         *,
-        details:session_details(
+        session_details:session_details(
           *,
-          exercise:exercises(*),
-          logs:sessions_exercise_details(*)
+          exercises:exercises(*),
+          exercise_logs:sessions_exercise_details(*)
         )
       `)
       .eq('user_id', userId)
@@ -684,42 +700,68 @@ export const WorkoutRepository = {
     return deleteSessionDetailById(sessionDetailId, userId);
   },
 
-  async upsertLogs(logs: any[], userId: number): Promise<any[]> {
+  async upsertLogs(sessionId: number, logs: any[], userId: number): Promise<any[]> {
     if (logs.length === 0) return [];
 
-    // 1. Identify all unique session_detail_ids for ownership check
-    const sessionDetailIds = Array.from(new Set(logs.map(log => log.session_detail_id).filter(Boolean)));
-    for (const sid of sessionDetailIds) {
-      await ensureSessionDetailOwnedByUser(sid as number, userId);
-    }
+    // 0. Verify session ownership
+    await ensureSessionOwnedByUser(sessionId, userId);
 
-    // 2. We also need to check for logs that have set_id but are missing session_detail_id
-    // to ensure they are owned by the user.
-    const logsWithSetId = logs.filter(l => l.set_id && !l.session_detail_id);
-    for (const log of logsWithSetId) {
-      const sid = await getSessionDetailIdBySetId(log.set_id);
-      await ensureSessionDetailOwnedByUser(sid, userId);
-    }
+    // 1. Map exercise types for cardio checks
+    const exerciseIds = Array.from(new Set(logs.map(log => log.exercise_id).filter(Boolean)));
+    const exerciseTypeMap = await buildExerciseTypeMap(exerciseIds.map(id => Number(id)));
 
-    // 3. Determine which session details are cardio
-    const cardioMap = new Map<number, boolean>();
-    const allSessionDetailIds = Array.from(new Set([
-      ...sessionDetailIds,
-      ...(await Promise.all(logsWithSetId.map(l => getSessionDetailIdBySetId(l.set_id))))
-    ]));
+    // 2. Resolve session_detail_ids for all logs
+    // We need to keep a cache of new session_details created during this batch
+    const sessionDetailCache = new Map<number, number>();
 
-    for (const sid of allSessionDetailIds) {
-      cardioMap.set(sid as number, await isCardioBySessionDetailId(sid as number));
-    }
+    // Get existing session_details for this session
+    const { data: existingDetails } = await supabase
+      .from('session_details')
+      .select('session_detail_id, exercise_id')
+      .eq('session_id', sessionId);
+    
+    (existingDetails || []).forEach(d => {
+      sessionDetailCache.set(d.exercise_id, d.session_detail_id);
+    });
 
-    // 4. Prepare data for upsert
-    const upsertData = await Promise.all(logs.map(async (log) => {
-      let sid = log.session_detail_id;
-      if (!sid && log.set_id) {
-        sid = await getSessionDetailIdBySetId(log.set_id);
+    // 3. Prepare data and ensure all logs have a valid session_detail_id (creating them if needed)
+    const upsertData = [];
+    for (const log of logs) {
+      let sid = log.session_detail_id ? Number(log.session_detail_id) : NaN;
+      
+      // If no session_detail_id, try using exercise_id
+      if (isNaN(sid) && log.exercise_id) {
+        const exId = Number(log.exercise_id);
+        if (!sessionDetailCache.has(exId)) {
+          // Create new session_detail
+          const { data: newDetail, error: detailError } = await supabase
+            .from('session_details')
+            .insert([{ 
+              session_id: sessionId, 
+              exercise_id: exId,
+              status: 'UNFINISHED'
+            }])
+            .select('session_detail_id')
+            .single();
+
+          if (detailError) throw new Error(detailError.message);
+          sessionDetailCache.set(exId, newDetail.session_detail_id);
+        }
+        sid = sessionDetailCache.get(exId)!;
       }
 
-      const isCardio = cardioMap.get(sid);
+      // If still NaN and we have a set_id, look it up (sanity check for existing logs)
+      if (isNaN(sid) && log.set_id) {
+        sid = await getSessionDetailIdBySetId(Number(log.set_id));
+        // Verify ownership (though session ownership is already checked, this confirms the set ID belongs to THIS session's detail)
+        await ensureSessionDetailOwnedByUser(sid, userId);
+      }
+
+      if (isNaN(sid)) {
+        throw new Error('INVALID_LOG_PAYLOAD: Missing session_detail_id or exercise_id for new logs');
+      }
+
+      const isCardio = normalizeExerciseType(exerciseTypeMap.get(log.exercise_id)) === 'cardio';
       
       let status = 'UNFINISHED';
       if (log.status !== undefined) {
@@ -732,16 +774,16 @@ export const WorkoutRepository = {
 
       const durationMinutes = log.duration ?? log.actual_duration ?? (log.duration_seconds ? Math.round(log.duration_seconds / 60) : 0);
 
-      return {
-        set_id: log.set_id, // Supabase will use this for matching
+      upsertData.push({
+        set_id: log.set_id ? Number(log.set_id) : undefined,
         session_detail_id: sid,
         reps: isCardio ? 0 : (log.actual_reps ?? log.reps ?? 0),
         duration: isCardio ? durationMinutes : 0,
         weight_kg: isCardio ? 0 : (log.weight_kg ?? 0),
         status: status,
         notes: log.notes ?? null,
-      };
-    }));
+      });
+    }
 
     const { data, error } = await supabase
       .from('sessions_exercise_details')
