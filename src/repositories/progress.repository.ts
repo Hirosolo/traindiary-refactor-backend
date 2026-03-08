@@ -96,7 +96,7 @@ export const ProgressRepository = {
 
     // Daily Summary Map
     const dailyMap = new Map<string, any>();
-    const exerciseMap: Record<string, { name: string, count: number, volume: number }> = {};
+    const exerciseMap: Record<string, { name: string, count: number, volume: number, history: { date: string, weight: number, reps: number }[] }> = {};
 
     // Calculate total volume and gr_score
     let totalGrScore = 0;
@@ -124,10 +124,13 @@ export const ProgressRepository = {
           const exerciseName = d.exercise?.name || 'Unknown';
 
           if (!exerciseMap[exerciseName]) {
-            exerciseMap[exerciseName] = { name: exerciseName, count: 0, volume: 0 };
+            exerciseMap[exerciseName] = { name: exerciseName, count: 0, volume: 0, history: [] };
           }
           
           let detailForce = 0;
+          let maxLogWeight = 0;
+          let maxLogReps = 0;
+
           d.logs?.forEach((l: any) => {
             const reps = l.reps || 0;
             const weight = l.weight_kg || 0;
@@ -138,11 +141,31 @@ export const ProgressRepository = {
 
             exerciseMap[exerciseName].count += 1;
             exerciseMap[exerciseName].volume += volume;
+
+            if (weight > maxLogWeight) {
+              maxLogWeight = weight;
+              maxLogReps = reps;
+            } else if (weight === maxLogWeight && reps > maxLogReps) {
+              maxLogReps = reps;
+            }
           });
+
+          if (maxLogWeight > 0 || maxLogReps > 0) {
+            exerciseMap[exerciseName].history.push({
+               date: date,
+               weight: maxLogWeight,
+               reps: maxLogReps
+            });
+          }
 
           muscleGroups[category] = (muscleGroups[category] || 0) + detailForce;
         });
       }
+    });
+
+    // Sort history by date for each exercise
+    Object.values(exerciseMap).forEach(ex => {
+       ex.history.sort((a, b) => a.date.localeCompare(b.date));
     });
 
     // Calculate previous period GR score
