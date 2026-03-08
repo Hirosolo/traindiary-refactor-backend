@@ -6,7 +6,7 @@ export interface CalculationMetrics {
   activity_level: 'sedentary' | 'light' | 'moderate' | 'heavy' | 'athlete';
   goal_type: 'cutting' | 'lean_bulk' | 'maintain' | 'recomposition';
   goal_speed: 'slow' | 'moderate' | 'aggressive';
-  workout_days_per_week?: number;
+  body_fat_percentage?: number;
 }
 
 export interface CalculationResult {
@@ -52,14 +52,22 @@ const CALORIE_ADJUSTMENTS = {
 
 export const NutritionService = {
   calculateGoal(metrics: CalculationMetrics): CalculationResult {
-    const { age, sex, height_cm, weight_kg, activity_level, goal_type, goal_speed, workout_days_per_week = 0 } = metrics;
+    const { age, sex, height_cm, weight_kg, activity_level, goal_type, goal_speed, body_fat_percentage } = metrics;
 
-    // 1. BMR Calculation (Mifflin-St Jeor)
-    let bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age);
-    if (sex === 'male') {
-      bmr += 5;
+    // 1. BMR Calculation
+    let bmr = 0;
+    if (body_fat_percentage !== undefined && body_fat_percentage > 0) {
+      // Katch-McArdle formula
+      const lean_body_mass = weight_kg * (1 - (body_fat_percentage / 100));
+      bmr = 370 + (21.6 * lean_body_mass);
     } else {
-      bmr -= 161;
+      // Mifflin-St Jeor formula
+      bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age);
+      if (sex === 'male') {
+        bmr += 5;
+      } else {
+        bmr -= 161;
+      }
     }
 
     // 2. TDEE Calculation
@@ -88,11 +96,7 @@ export const NutritionService = {
 
     // 7. Hydration Calculation
     // Base: 35ml per kg
-    // Workout: +500ml per hour (approx 1 hr per workout day spread over week is roughly workout_days * 500 / 7)
-    // But spec says +500ml per hour of exercise. Let's assume daily target includes average workout duration.
-    const base_hydration = weight_kg * 35;
-    const workout_avg_daily_hydration = (workout_days_per_week * 500) / 7;
-    const hydration_ml = Math.round(base_hydration + workout_avg_daily_hydration);
+    const hydration_ml = Math.round(weight_kg * 35);
 
     return {
       bmr: Math.round(bmr),
