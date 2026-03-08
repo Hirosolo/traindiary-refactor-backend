@@ -785,12 +785,30 @@ export const WorkoutRepository = {
       });
     }
 
-    const { data, error } = await supabase
-      .from('sessions_exercise_details')
-      .upsert(upsertData)
-      .select();
+    // 5. Separate new logs from existing logs to avoid PK constraint issues
+    const inserts = upsertData.filter(d => d.set_id === undefined).map(({ set_id, ...d }) => d);
+    const updates = upsertData.filter(d => d.set_id !== undefined);
 
-    if (error) throw new Error(error.message);
-    return data || [];
+    const results = [];
+
+    if (inserts.length > 0) {
+      const { data: insertData, error: insertError } = await supabase
+        .from('sessions_exercise_details')
+        .insert(inserts)
+        .select();
+      if (insertError) throw new Error(insertError.message);
+      if (insertData) results.push(...insertData);
+    }
+
+    if (updates.length > 0) {
+      const { data: updateData, error: updateError } = await supabase
+        .from('sessions_exercise_details')
+        .upsert(updates)
+        .select();
+      if (updateError) throw new Error(updateError.message);
+      if (updateData) results.push(...updateData);
+    }
+
+    return results;
   }
 };
