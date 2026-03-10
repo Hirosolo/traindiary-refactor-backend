@@ -45,6 +45,16 @@ type WorkoutPlanRow = {
   plan_days?: PlanDayRow[];
 };
 
+function mapPlanErrorMessage(message?: string | null): string {
+  if (!message) return "Internal Server Error";
+  if (
+    message.includes("Could not find the 'user_id' column of 'workout_plans' in the schema cache")
+  ) {
+    return "Database schema is missing workout_plans.user_id. Run the migration to add user ownership for workout plans.";
+  }
+  return message;
+}
+
 function normalizePlan(plan: WorkoutPlanRow, userId: number) {
   const days = Array.isArray(plan.plan_days) ? [...plan.plan_days] : [];
   days.sort((a, b) => (a.day_number ?? 0) - (b.day_number ?? 0));
@@ -159,7 +169,7 @@ async function fetchPlanById(planId: number, userId: number) {
     .single();
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(mapPlanErrorMessage(error.message));
   }
 
   return normalizePlan(data as unknown as WorkoutPlanRow, userId);
@@ -200,7 +210,7 @@ export async function GET(req: NextRequest) {
       .order("plan_id", { ascending: false });
 
     if (error) {
-      return errorResponse(error.message, 500);
+      return errorResponse(mapPlanErrorMessage(error.message), 500);
     }
 
     const plans = (data as unknown as WorkoutPlanRow[]).map((item) =>
@@ -243,7 +253,10 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (planError || !planData) {
-      return errorResponse(planError?.message || "Failed to create plan", 500);
+      return errorResponse(
+        mapPlanErrorMessage(planError?.message) || "Failed to create plan",
+        500,
+      );
     }
 
     const planId = Number(planData.plan_id);

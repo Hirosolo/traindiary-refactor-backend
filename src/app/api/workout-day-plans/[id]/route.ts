@@ -45,6 +45,16 @@ type WorkoutPlanRow = {
   plan_days?: PlanDayRow[];
 };
 
+function mapPlanErrorMessage(message?: string | null): string {
+  if (!message) return "Internal Server Error";
+  if (
+    message.includes("Could not find the 'user_id' column of 'workout_plans' in the schema cache")
+  ) {
+    return "Database schema is missing workout_plans.user_id. Run the migration to add user ownership for workout plans.";
+  }
+  return message;
+}
+
 function normalizePlan(plan: WorkoutPlanRow, userId: number) {
   const days = Array.isArray(plan.plan_days) ? [...plan.plan_days] : [];
   days.sort((a, b) => (a.day_number ?? 0) - (b.day_number ?? 0));
@@ -159,7 +169,7 @@ async function fetchPlanById(planId: number, userId: number) {
     .single();
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(mapPlanErrorMessage(error.message));
   }
 
   return normalizePlan(data as unknown as WorkoutPlanRow, userId);
@@ -203,7 +213,7 @@ export async function PUT(
       .eq("user_id", user.userId);
 
     if (planUpdateError) {
-      return errorResponse(planUpdateError.message, 500);
+      return errorResponse(mapPlanErrorMessage(planUpdateError.message), 500);
     }
 
     const { data: existingDays, error: daysError } = await supabase
@@ -299,7 +309,7 @@ export async function DELETE(
       .maybeSingle();
 
     if (ownedPlanError) {
-      return errorResponse(ownedPlanError.message, 500);
+      return errorResponse(mapPlanErrorMessage(ownedPlanError.message), 500);
     }
     if (!ownedPlan) {
       return errorResponse("Plan not found", 404);
@@ -343,7 +353,7 @@ export async function DELETE(
       .eq("user_id", user.userId);
 
     if (planDeleteError) {
-      return errorResponse(planDeleteError.message, 500);
+      return errorResponse(mapPlanErrorMessage(planDeleteError.message), 500);
     }
 
     return successResponse({ plan_id: planId }, "Workout day plan deleted");
