@@ -39,6 +39,7 @@ type PlanDayRow = {
 
 type WorkoutPlanRow = {
   plan_id: number;
+  user_id?: number;
   name: string;
   description?: string | null;
   plan_days?: PlanDayRow[];
@@ -154,6 +155,7 @@ async function fetchPlanById(planId: number, userId: number) {
     `,
     )
     .eq("plan_id", planId)
+    .eq("user_id", userId)
     .single();
 
   if (error) {
@@ -197,7 +199,8 @@ export async function PUT(
         name: payload.name,
         description: payload.notes,
       })
-      .eq("plan_id", planId);
+      .eq("plan_id", planId)
+      .eq("user_id", user.userId);
 
     if (planUpdateError) {
       return errorResponse(planUpdateError.message, 500);
@@ -288,6 +291,20 @@ export async function DELETE(
       return errorResponse("Invalid plan ID", 400);
     }
 
+    const { data: ownedPlan, error: ownedPlanError } = await supabase
+      .from("workout_plans")
+      .select("plan_id")
+      .eq("plan_id", planId)
+      .eq("user_id", user.userId)
+      .maybeSingle();
+
+    if (ownedPlanError) {
+      return errorResponse(ownedPlanError.message, 500);
+    }
+    if (!ownedPlan) {
+      return errorResponse("Plan not found", 404);
+    }
+
     const { data: dayRows, error: daysError } = await supabase
       .from("plan_days")
       .select("plan_day_id")
@@ -322,7 +339,8 @@ export async function DELETE(
     const { error: planDeleteError } = await supabase
       .from("workout_plans")
       .delete()
-      .eq("plan_id", planId);
+      .eq("plan_id", planId)
+      .eq("user_id", user.userId);
 
     if (planDeleteError) {
       return errorResponse(planDeleteError.message, 500);

@@ -39,6 +39,7 @@ type PlanDayRow = {
 
 type WorkoutPlanRow = {
   plan_id: number;
+  user_id?: number;
   name: string;
   description?: string | null;
   plan_days?: PlanDayRow[];
@@ -154,6 +155,7 @@ async function fetchPlanById(planId: number, userId: number) {
     `,
     )
     .eq("plan_id", planId)
+    .eq("user_id", userId)
     .single();
 
   if (error) {
@@ -194,6 +196,7 @@ export async function GET(req: NextRequest) {
         )
       `,
       )
+      .eq("user_id", user.userId)
       .order("plan_id", { ascending: false });
 
     if (error) {
@@ -232,6 +235,7 @@ export async function POST(req: NextRequest) {
     const { data: planData, error: planError } = await supabase
       .from("workout_plans")
       .insert({
+        user_id: user.userId,
         name: payload.name,
         description: payload.notes,
       })
