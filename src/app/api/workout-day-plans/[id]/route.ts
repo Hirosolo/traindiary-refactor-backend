@@ -39,21 +39,10 @@ type PlanDayRow = {
 
 type WorkoutPlanRow = {
   plan_id: number;
-  user_id?: number;
   name: string;
   description?: string | null;
   plan_days?: PlanDayRow[];
 };
-
-function mapPlanErrorMessage(message?: string | null): string {
-  if (!message) return "Internal Server Error";
-  if (
-    message.includes("Could not find the 'user_id' column of 'workout_plans' in the schema cache")
-  ) {
-    return "Database schema is missing workout_plans.user_id. Run the migration to add user ownership for workout plans.";
-  }
-  return message;
-}
 
 function normalizePlan(plan: WorkoutPlanRow, userId: number) {
   const days = Array.isArray(plan.plan_days) ? [...plan.plan_days] : [];
@@ -165,11 +154,10 @@ async function fetchPlanById(planId: number, userId: number) {
     `,
     )
     .eq("plan_id", planId)
-    .eq("user_id", userId)
     .single();
 
   if (error) {
-    throw new Error(mapPlanErrorMessage(error.message));
+    throw new Error(error.message);
   }
 
   return normalizePlan(data as unknown as WorkoutPlanRow, userId);
@@ -209,11 +197,10 @@ export async function PUT(
         name: payload.name,
         description: payload.notes,
       })
-      .eq("plan_id", planId)
-      .eq("user_id", user.userId);
+      .eq("plan_id", planId);
 
     if (planUpdateError) {
-      return errorResponse(mapPlanErrorMessage(planUpdateError.message), 500);
+      return errorResponse(planUpdateError.message, 500);
     }
 
     const { data: existingDays, error: daysError } = await supabase
@@ -301,20 +288,6 @@ export async function DELETE(
       return errorResponse("Invalid plan ID", 400);
     }
 
-    const { data: ownedPlan, error: ownedPlanError } = await supabase
-      .from("workout_plans")
-      .select("plan_id")
-      .eq("plan_id", planId)
-      .eq("user_id", user.userId)
-      .maybeSingle();
-
-    if (ownedPlanError) {
-      return errorResponse(mapPlanErrorMessage(ownedPlanError.message), 500);
-    }
-    if (!ownedPlan) {
-      return errorResponse("Plan not found", 404);
-    }
-
     const { data: dayRows, error: daysError } = await supabase
       .from("plan_days")
       .select("plan_day_id")
@@ -349,11 +322,10 @@ export async function DELETE(
     const { error: planDeleteError } = await supabase
       .from("workout_plans")
       .delete()
-      .eq("plan_id", planId)
-      .eq("user_id", user.userId);
+      .eq("plan_id", planId);
 
     if (planDeleteError) {
-      return errorResponse(mapPlanErrorMessage(planDeleteError.message), 500);
+      return errorResponse(planDeleteError.message, 500);
     }
 
     return successResponse({ plan_id: planId }, "Workout day plan deleted");

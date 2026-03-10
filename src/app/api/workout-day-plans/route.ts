@@ -39,21 +39,10 @@ type PlanDayRow = {
 
 type WorkoutPlanRow = {
   plan_id: number;
-  user_id?: number;
   name: string;
   description?: string | null;
   plan_days?: PlanDayRow[];
 };
-
-function mapPlanErrorMessage(message?: string | null): string {
-  if (!message) return "Internal Server Error";
-  if (
-    message.includes("Could not find the 'user_id' column of 'workout_plans' in the schema cache")
-  ) {
-    return "Database schema is missing workout_plans.user_id. Run the migration to add user ownership for workout plans.";
-  }
-  return message;
-}
 
 function normalizePlan(plan: WorkoutPlanRow, userId: number) {
   const days = Array.isArray(plan.plan_days) ? [...plan.plan_days] : [];
@@ -165,11 +154,10 @@ async function fetchPlanById(planId: number, userId: number) {
     `,
     )
     .eq("plan_id", planId)
-    .eq("user_id", userId)
     .single();
 
   if (error) {
-    throw new Error(mapPlanErrorMessage(error.message));
+    throw new Error(error.message);
   }
 
   return normalizePlan(data as unknown as WorkoutPlanRow, userId);
@@ -206,11 +194,10 @@ export async function GET(req: NextRequest) {
         )
       `,
       )
-      .eq("user_id", user.userId)
       .order("plan_id", { ascending: false });
 
     if (error) {
-      return errorResponse(mapPlanErrorMessage(error.message), 500);
+      return errorResponse(error.message, 500);
     }
 
     const plans = (data as unknown as WorkoutPlanRow[]).map((item) =>
@@ -245,7 +232,6 @@ export async function POST(req: NextRequest) {
     const { data: planData, error: planError } = await supabase
       .from("workout_plans")
       .insert({
-        user_id: user.userId,
         name: payload.name,
         description: payload.notes,
       })
@@ -253,10 +239,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (planError || !planData) {
-      return errorResponse(
-        mapPlanErrorMessage(planError?.message) || "Failed to create plan",
-        500,
-      );
+      return errorResponse(planError?.message || "Failed to create plan", 500);
     }
 
     const planId = Number(planData.plan_id);
