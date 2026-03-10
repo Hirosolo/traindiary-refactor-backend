@@ -352,6 +352,34 @@ export const MealRepository = {
 };
 
 export const WorkoutRepository = {
+  async getExercisesFromPlan(planId: number): Promise<any[]> {
+    const { data: days, error: dayError } = await supabase
+      .from('plan_days')
+      .select('plan_day_id, day_number, day_type')
+      .eq('plan_id', planId)
+      .order('day_number', { ascending: true })
+      .limit(1);
+
+    if (dayError) throw new Error(dayError.message);
+
+    const day = (days || [])[0];
+    if (!day) return [];
+
+    const { data: planExercises, error: exError } = await supabase
+      .from('plan_day_exercises')
+      .select('exercise_id, sets, reps')
+      .eq('plan_day_id', day.plan_day_id);
+
+    if (exError) throw new Error(exError.message);
+
+    return (planExercises || []).map((item: any) => ({
+      exercise_id: item.exercise_id,
+      actual_sets: Number(item.sets || 1),
+      actual_reps: Number(item.reps || 0),
+      weight_kg: 0,
+    }));
+  },
+
   async getPRs(userId: number, exerciseIds: number[]): Promise<Map<number, any>> {
     if (exerciseIds.length === 0) return new Map();
     const { data, error } = await supabase
@@ -449,7 +477,7 @@ export const WorkoutRepository = {
   },
 
   async create(userId: number, workoutData: any): Promise<any> {
-    const { scheduled_date, type, notes, status = 'PENDING', exercises } = workoutData;
+    const { scheduled_date, type, notes, status = 'PENDING', exercises, plan_id } = workoutData;
 
     const datePart = (scheduled_date || '').toString().split(/[T ]/)[0];
     const [yearStr, monthStr, dayStr] = datePart.split('-');
@@ -478,30 +506,49 @@ export const WorkoutRepository = {
       throw new Error('WORKOUT_SESSION_ALREADY_EXISTS');
     }
 
+    let resolvedType = type;
+    if (!resolvedType && plan_id) {
+      const { data: days } = await supabase
+        .from('plan_days')
+        .select('day_type')
+        .eq('plan_id', plan_id)
+        .order('day_number', { ascending: true })
+        .limit(1);
+      resolvedType = days?.[0]?.day_type || null;
+    }
+
     const { data: session, error: sessionError } = await supabase
       .from('workout_sessions')
-      .insert([{ user_id: userId, scheduled_date, type, notes, status }])
+      .insert([{ user_id: userId, scheduled_date, type: resolvedType, notes, status }])
       .select()
       .single();
     
     if (sessionError) throw new Error(sessionError.message);
 
+    let resolvedExercises = Array.isArray(exercises) ? exercises : [];
+    if (resolvedExercises.length === 0 && plan_id) {
+      resolvedExercises = await this.getExercisesFromPlan(Number(plan_id));
+    }
+
     // Group exercises by exercise_id to avoid creating duplicate session_details
     const exerciseMap = new Map<number, any[]>();
     
-    for (const ex of exercises) {
+    for (const ex of resolvedExercises) {
       const exerciseId = Number(ex.exercise_id);
       if (!exerciseMap.has(exerciseId)) {
         exerciseMap.set(exerciseId, []);
       }
       
       // Collect all sets for this exercise
-      const sets = ex.sets || [{
-        actual_sets: ex.actual_sets || 1,
-        actual_reps: ex.actual_reps || 0,
-        weight_kg: ex.weight_kg || 0,
-        notes: ex.notes
-      }];
+      const sets = ex.sets
+        ? ex.sets
+        : Array.from({ length: Math.max(Number(ex.actual_sets || 1), 1) }, () => ({
+            actual_reps: ex.actual_reps || 0,
+            weight_kg: ex.weight_kg || 0,
+            duration: ex.duration,
+            notes: ex.notes,
+            status: ex.status,
+          }));
       
       exerciseMap.get(exerciseId)!.push(...sets);
     }
