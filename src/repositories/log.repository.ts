@@ -232,58 +232,70 @@ export const MealRepository = {
   },
 
   async findById(mealId: number, userId: number): Promise<any> {
-    const { data, error } = await supabase
+    const { data: meal, error: mealError } = await supabase
       .from('user_meals')
-      .select(`
-        meal_id,
-        meal_type,
-        log_date,
-        details:user_meal_details(
-          meal_detail_id,
-          numbers_of_serving,
-          food:foods(
-            food_id,
-            name,
-            unit_type,
-            image,
-            calories_per_serving,
-            protein_per_serving,
-            carbs_per_serving,
-            fat_per_serving,
-            fibers_per_serving,
-            sugars_per_serving,
-            zincs_per_serving,
-            magnesiums_per_serving,
-            calciums_per_serving,
-            irons_per_serving,
-            vitamin_a_per_serving,
-            vitamin_c_per_serving,
-            vitamin_b12_per_serving,
-            vitamin_d_per_serving
-          )
-        )
-      `)
+      .select('meal_id, meal_type, log_date')
       .eq('meal_id', mealId)
       .eq('user_id', userId)
       .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
+    if (mealError) {
+      if (mealError.code === 'PGRST116') {
         throw new Error('Meal not found');
       }
-      throw new Error(error.message);
+      throw new Error(mealError.message);
+    }
+
+    const { data: details, error: detailError } = await supabase
+      .from('user_meal_details')
+      .select('meal_detail_id, food_id, numbers_of_serving')
+      .eq('meal_id', mealId);
+
+    if (detailError) throw new Error(detailError.message);
+
+    const foodIds = Array.from(new Set((details || []).map((d: any) => d.food_id).filter(Boolean)));
+
+    let foodsById = new Map<number, any>();
+    if (foodIds.length > 0) {
+      const { data: foods, error: foodsError } = await supabase
+        .from('foods')
+        .select(`
+          food_id,
+          name,
+          serving_type,
+          image,
+          calories_per_serving,
+          protein_per_serving,
+          carbs_per_serving,
+          fat_per_serving,
+          fibers_per_serving,
+          sugars_per_serving,
+          zincs_per_serving,
+          magnesiums_per_serving,
+          calciums_per_serving,
+          irons_per_serving,
+          vitamin_a_per_serving,
+          vitamin_c_per_serving,
+          vitamin_b12_per_serving,
+          vitamin_d_per_serving
+        `)
+        .in('food_id', foodIds);
+
+      if (foodsError) throw new Error(foodsError.message);
+      foodsById = new Map((foods || []).map((f: any) => [f.food_id, f]));
     }
 
     // Transform to calculate total nutrition per food
-    const foods = (data.details || []).map((detail: any) => {
+    const foods = (details || []).map((detail: any) => {
       const servings = detail.numbers_of_serving || 0;
-      const food = detail.food;
+      const food = foodsById.get(detail.food_id);
       
       return {
         meal_detail_id: detail.meal_detail_id,
         food_id: food?.food_id,
         food_name: food?.name,
-        unit_type: food?.unit_type,
+        unit_type: food?.serving_type,
+        serving_type: food?.serving_type,
         image: food?.image,
         numbers_of_serving: servings,
         total_calories: Math.round((food?.calories_per_serving || 0) * servings * 100) / 100,
@@ -304,9 +316,9 @@ export const MealRepository = {
     });
 
     return {
-      meal_id: data.meal_id,
-      meal_type: data.meal_type,
-      log_date: data.log_date,
+      meal_id: meal.meal_id,
+      meal_type: meal.meal_type,
+      log_date: meal.log_date,
       foods,
     };
   },
