@@ -194,6 +194,7 @@ export async function GET(req: NextRequest) {
         )
       `,
       )
+      .eq("user_id", user.userId)
       .order("plan_id", { ascending: false });
 
     if (error) {
@@ -234,6 +235,7 @@ export async function POST(req: NextRequest) {
       .insert({
         name: payload.name,
         description: payload.notes,
+        user_id: user.userId,
       })
       .select("plan_id")
       .single();

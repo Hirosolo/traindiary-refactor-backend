@@ -154,6 +154,7 @@ async function fetchPlanById(planId: number, userId: number) {
     `,
     )
     .eq("plan_id", planId)
+    .eq("user_id", userId)
     .single();
 
   if (error) {
@@ -197,7 +198,8 @@ export async function PUT(
         name: payload.name,
         description: payload.notes,
       })
-      .eq("plan_id", planId);
+      .eq("plan_id", planId)
+      .eq("user_id", user.userId);
 
     if (planUpdateError) {
       return errorResponse(planUpdateError.message, 500);
@@ -286,6 +288,18 @@ export async function DELETE(
     const planId = Number(id);
     if (!Number.isFinite(planId) || planId <= 0) {
       return errorResponse("Invalid plan ID", 400);
+    }
+
+    // Verify ownership before deleting
+    const { data: ownerCheck } = await supabase
+      .from("workout_plans")
+      .select("plan_id")
+      .eq("plan_id", planId)
+      .eq("user_id", user.userId)
+      .single();
+
+    if (!ownerCheck) {
+      return errorResponse("Plan not found or unauthorized", 404);
     }
 
     const { data: dayRows, error: daysError } = await supabase
