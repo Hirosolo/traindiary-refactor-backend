@@ -435,6 +435,77 @@ export const WorkoutRepository = {
     }
   },
 
+  async updateSessionPRsFromMaxSets(sessionId: number, userId: number) {
+    const { data: details, error } = await supabase
+      .from('session_details')
+      .select(`
+        exercise_id,
+        logs:sessions_exercise_details(weight_kg, reps)
+      `)
+      .eq('session_id', sessionId);
+
+    if (error) throw new Error(error.message);
+
+    const bestByExercise = new Map<number, { weight: number; reps: number }>();
+
+    (details || []).forEach((detail: any) => {
+      const exerciseId = Number(detail.exercise_id || 0);
+      if (!exerciseId) return;
+
+      const logs = Array.isArray(detail.logs) ? detail.logs : [];
+      logs.forEach((log: any) => {
+        const weight = Number(log.weight_kg || 0);
+        const reps = Number(log.reps || 0);
+        if (weight <= 0) return;
+
+        const existing = bestByExercise.get(exerciseId);
+        if (!existing || weight > existing.weight || (weight === existing.weight && reps > existing.reps)) {
+          bestByExercise.set(exerciseId, { weight, reps });
+        }
+      });
+    });
+
+    const exerciseIds = Array.from(bestByExercise.keys());
+    if (exerciseIds.length === 0) return;
+
+    const { data: currentPRs, error: prError } = await supabase
+      .from('personal_records')
+      .select('record_id, exercise_id, weight_kg')
+      .eq('user_id', userId)
+      .in('exercise_id', exerciseIds);
+
+    if (prError) throw new Error(prError.message);
+
+    const currentByExercise = new Map<number, any>();
+    (currentPRs || []).forEach((row: any) => currentByExercise.set(row.exercise_id, row));
+
+    for (const [exerciseId, best] of bestByExercise.entries()) {
+      const current = currentByExercise.get(exerciseId);
+      if (!current) {
+        const { error: insertError } = await supabase
+          .from('personal_records')
+          .insert([{ user_id: userId, exercise_id: exerciseId, weight_kg: best.weight, reps: best.reps }]);
+
+        if (insertError) throw new Error(insertError.message);
+        continue;
+      }
+
+      const currentWeight = Number(current.weight_kg || 0);
+      if (best.weight > currentWeight) {
+        const { error: updateError } = await supabase
+          .from('personal_records')
+          .update({
+            weight_kg: best.weight,
+            reps: best.reps,
+            achieved_at: new Date().toISOString(),
+          })
+          .eq('record_id', current.record_id);
+
+        if (updateError) throw new Error(updateError.message);
+      }
+    }
+  },
+
   async findByUserId(userId: number, filters: { month?: string, date?: string } = {}): Promise<any[]> {
     let query = supabase
       .from('workout_sessions')
@@ -490,33 +561,6 @@ export const WorkoutRepository = {
 
   async create(userId: number, workoutData: any): Promise<any> {
     const { scheduled_date, type, notes, status = 'PENDING', exercises, plan_id } = workoutData;
-
-    const datePart = (scheduled_date || '').toString().split(/[T ]/)[0];
-    const [yearStr, monthStr, dayStr] = datePart.split('-');
-    const year = Number(yearStr);
-    const month = Number(monthStr);
-    const day = Number(dayStr);
-
-    if (!datePart || Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
-      throw new Error('Invalid scheduled_date');
-    }
-
-    const startDate = `${yearStr}-${monthStr.padStart(2, '0')}-${dayStr.padStart(2, '0')}`;
-    const nextDate = new Date(year, month - 1, day + 1);
-    const endDate = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}-${String(nextDate.getDate()).padStart(2, '0')}`;
-
-    const { data: existingSessions, error: existingError } = await supabase
-      .from('workout_sessions')
-      .select('session_id')
-      .eq('user_id', userId)
-      .gte('scheduled_date', startDate)
-      .lt('scheduled_date', endDate)
-      .limit(1);
-
-    if (existingError) throw new Error(existingError.message);
-    if (existingSessions && existingSessions.length > 0) {
-      throw new Error('WORKOUT_SESSION_ALREADY_EXISTS');
-    }
 
     let resolvedType = type;
     if (!resolvedType && plan_id) {
@@ -606,7 +650,7 @@ export const WorkoutRepository = {
       if (logError) throw new Error(logError.message);
     }
 
-    // If status is COMPLETED, calculate and update GR score
+    // If status is COMPLETED, calculate and update GR score and session PRs
     if (status === 'COMPLETED') {
       const { data: sessionDetails } = await supabase
         .from('session_details')
@@ -635,6 +679,8 @@ export const WorkoutRepository = {
         .eq('session_id', session.session_id)
         .select()
         .single();
+
+      await this.updateSessionPRsFromMaxSets(session.session_id, userId);
       
       if (!updateError) return updatedSession;
     }
@@ -790,7 +836,7 @@ export const WorkoutRepository = {
          updateData.status = sessionData.completed ? 'COMPLETED' : 'IN_PROGRESS';
      }
 
-     // Calculate GR score when status changes to COMPLETED
+    // Calculate GR score and update session PRs when status changes to COMPLETED
      if (updateData.status === 'COMPLETED') {
        const { data: sessionDetails } = await supabase
          .from('session_details')
@@ -813,6 +859,8 @@ export const WorkoutRepository = {
          });
        }
        updateData.gr_score = Math.round(totalGrScore);
+
+       await this.updateSessionPRsFromMaxSets(sessionId, userId);
      }
 
      const { data, error } = await supabase
