@@ -69,23 +69,14 @@ const isCardioByLogId = async (logId: number): Promise<boolean> => {
 const ensureSessionDetailOwnedByUser = async (sessionDetailId: number, userId?: number) => {
   if (!userId) return;
 
-  const { data: detail, error: detailError } = await supabase
+  const { data, error } = await supabase
     .from('session_details')
-    .select('session_id')
+    .select('session_id, workout_sessions!inner(user_id)')
     .eq('session_detail_id', sessionDetailId)
-    .single();
+    .eq('workout_sessions.user_id', userId)
+    .maybeSingle();
 
-  if (detailError) throw new Error(detailError.message);
-
-  const { data: session, error: sessionError } = await supabase
-    .from('workout_sessions')
-    .select('user_id')
-    .eq('session_id', detail.session_id)
-    .single();
-
-  if (sessionError) throw new Error(sessionError.message);
-
-  if (session.user_id !== userId) {
+  if (error || !data) {
     throw new Error('UNAUTHORIZED');
   }
 };
@@ -997,16 +988,7 @@ export const WorkoutRepository = {
     // Update PRs for all completed logs in this batch
     const completedLogs = results.filter(r => r.status === 'COMPLETED');
     if (completedLogs.length > 0) {
-        const detailIds = Array.from(new Set(completedLogs.map(l => l.session_detail_id)));
-        const { data: details } = await supabase.from('session_details').select('session_detail_id, exercise_id').in('session_detail_id', detailIds);
-        const detailToEx = new Map(details?.map(d => [d.session_detail_id, d.exercise_id]));
-        
-        for (const log of completedLogs) {
-            const exId = detailToEx.get(log.session_detail_id);
-            if (exId) {
-            await this.updatePR(userId, exId, log.weight_kg);
-            }
-        }
+        await this.updateSessionPRsFromMaxSets(sessionId, userId);
     }
 
     return results;
