@@ -396,7 +396,7 @@ export const WorkoutRepository = {
     if (exerciseIds.length === 0) return new Map();
     const { data, error } = await supabase
       .from('personal_records')
-      .select('*')
+      .select('record_id, exercise_id, weight_kg, achieved_at')
       .eq('user_id', userId)
       .in('exercise_id', exerciseIds);
 
@@ -406,31 +406,29 @@ export const WorkoutRepository = {
     return map;
   },
 
-  async updatePR(userId: number, exerciseId: number, weight: number, reps: number) {
-    if (!weight || !reps) return;
-    
-    // We update PR if weight is higher, or if weight is same but reps are higher
+  async updatePR(userId: number, exerciseId: number, weight: number) {
+    if (!weight) return;
+
     const { data: currentPR } = await supabase
       .from('personal_records')
-      .select('*')
+      .select('record_id, weight_kg')
       .eq('user_id', userId)
       .eq('exercise_id', exerciseId)
       .maybeSingle();
 
-    const isNewRecord = !currentPR || 
-      weight > currentPR.weight_kg || 
-      (weight === currentPR.weight_kg && reps > (currentPR.reps || 0));
+    const currentWeight = Number(currentPR?.weight_kg || 0);
+    const isNewRecord = !currentPR || weight > currentWeight;
 
     if (isNewRecord) {
       if (currentPR) {
         await supabase
           .from('personal_records')
-          .update({ weight_kg: weight, reps: reps, achieved_at: new Date().toISOString() })
+          .update({ weight_kg: weight, achieved_at: new Date().toISOString() })
           .eq('record_id', currentPR.record_id);
       } else {
         await supabase
           .from('personal_records')
-          .insert([{ user_id: userId, exercise_id: exerciseId, weight_kg: weight, reps: reps }]);
+          .insert([{ user_id: userId, exercise_id: exerciseId, weight_kg: weight }]);
       }
     }
   },
@@ -440,13 +438,13 @@ export const WorkoutRepository = {
       .from('session_details')
       .select(`
         exercise_id,
-        logs:sessions_exercise_details(weight_kg, reps)
+        logs:sessions_exercise_details(weight_kg)
       `)
       .eq('session_id', sessionId);
 
     if (error) throw new Error(error.message);
 
-    const bestByExercise = new Map<number, { weight: number; reps: number }>();
+    const bestByExercise = new Map<number, number>();
 
     (details || []).forEach((detail: any) => {
       const exerciseId = Number(detail.exercise_id || 0);
@@ -455,12 +453,11 @@ export const WorkoutRepository = {
       const logs = Array.isArray(detail.logs) ? detail.logs : [];
       logs.forEach((log: any) => {
         const weight = Number(log.weight_kg || 0);
-        const reps = Number(log.reps || 0);
         if (weight <= 0) return;
 
         const existing = bestByExercise.get(exerciseId);
-        if (!existing || weight > existing.weight || (weight === existing.weight && reps > existing.reps)) {
-          bestByExercise.set(exerciseId, { weight, reps });
+        if (!existing || weight > existing) {
+          bestByExercise.set(exerciseId, weight);
         }
       });
     });
@@ -479,24 +476,23 @@ export const WorkoutRepository = {
     const currentByExercise = new Map<number, any>();
     (currentPRs || []).forEach((row: any) => currentByExercise.set(row.exercise_id, row));
 
-    for (const [exerciseId, best] of bestByExercise.entries()) {
+    for (const [exerciseId, bestWeight] of bestByExercise.entries()) {
       const current = currentByExercise.get(exerciseId);
       if (!current) {
         const { error: insertError } = await supabase
           .from('personal_records')
-          .insert([{ user_id: userId, exercise_id: exerciseId, weight_kg: best.weight, reps: best.reps }]);
+          .insert([{ user_id: userId, exercise_id: exerciseId, weight_kg: bestWeight }]);
 
         if (insertError) throw new Error(insertError.message);
         continue;
       }
 
       const currentWeight = Number(current.weight_kg || 0);
-      if (best.weight > currentWeight) {
+      if (bestWeight > currentWeight) {
         const { error: updateError } = await supabase
           .from('personal_records')
           .update({
-            weight_kg: best.weight,
-            reps: best.reps,
+            weight_kg: bestWeight,
             achieved_at: new Date().toISOString(),
           })
           .eq('record_id', current.record_id);
@@ -616,7 +612,7 @@ export const WorkoutRepository = {
     for (const [exerciseId, allSets] of exerciseMap.entries()) {
       const pr = prMap.get(exerciseId);
       const defaultWeight = pr?.weight_kg || 0;
-      const defaultReps = pr?.reps || 10;
+      const defaultReps = 10;
       const { data: detail, error: detailError } = await supabase
         .from('session_details')
         .insert([{ 
@@ -730,7 +726,7 @@ export const WorkoutRepository = {
       if (detail) {
         const { data: session } = await supabase.from('workout_sessions').select('user_id').eq('session_id', detail.session_id).single();
         if (session) {
-          await this.updatePR(session.user_id, detail.exercise_id, data.weight_kg, data.reps);
+          await this.updatePR(session.user_id, detail.exercise_id, data.weight_kg);
         }
       }
     }
@@ -774,7 +770,7 @@ export const WorkoutRepository = {
         if (detail) {
             const { data: session } = await supabase.from('workout_sessions').select('user_id').eq('session_id', detail.session_id).single();
             if (session) {
-                await this.updatePR(session.user_id, detail.exercise_id, data.weight_kg, data.reps);
+          await this.updatePR(session.user_id, detail.exercise_id, data.weight_kg);
             }
         }
     }
@@ -1008,7 +1004,7 @@ export const WorkoutRepository = {
         for (const log of completedLogs) {
             const exId = detailToEx.get(log.session_detail_id);
             if (exId) {
-                await this.updatePR(userId, exId, log.weight_kg, log.reps);
+            await this.updatePR(userId, exId, log.weight_kg);
             }
         }
     }
