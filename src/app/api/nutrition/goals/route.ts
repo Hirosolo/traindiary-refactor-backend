@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       age, sex, height_cm, weight_kg, activity_level, 
       body_fat_percentage, is_body_fat_estimated,
       goal_type, goal_speed, bmr, tdee,
-      calories_target, protein_target_g, carbs_target_g, fat_target_g, hydration_target_ml,
+      calories_target, protein_target_g, carbs_target_g, fat_target_g,
       start_date
     } = body;
 
@@ -74,7 +74,6 @@ export async function POST(req: NextRequest) {
       carbs_target_g,
       fat_target_g,
       fiber_target_g: body.fiber_target_g || Math.round(calories_target / 1000 * 14), // Default fiber logic if not provided
-      hydration_target_ml,
       start_date: start_date || new Date().toISOString().split('T')[0],
       goal_type,
       goal_speed,

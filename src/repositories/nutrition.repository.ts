@@ -8,7 +8,6 @@ export interface NutritionGoal {
   carbs_target_g: number;
   fat_target_g: number;
   fiber_target_g: number;
-  hydration_target_ml: number;
   start_date: string;
   goal_type?: 'cutting' | 'lean_bulk' | 'maintain' | 'recomposition';
   goal_speed?: 'slow' | 'moderate' | 'aggressive';

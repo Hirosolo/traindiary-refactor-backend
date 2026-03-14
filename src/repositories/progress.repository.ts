@@ -102,18 +102,10 @@ export const ProgressRepository = {
     let totalVolume = 0;
     const muscleGroups: Record<string, number> = {};
 
-    // Get water logs in the period
-    const { data: waterLogs } = await supabase
-      .from('water_logs')
-      .select('amount_ml, log_date')
-      .eq('user_id', userId)
-      .gte('log_date', startDateStr)
-      .lt('log_date', endDateStr);
-
     workouts?.forEach(w => {
       const date = w.scheduled_date;
       if (!dailyMap.has(date)) {
-        dailyMap.set(date, { date, workouts: 0, kcal: 0, protein: 0, carbs: 0, fats: 0, fiber: 0, sugar: 0, gr: 0, water: 0 });
+        dailyMap.set(date, { date, workouts: 0, kcal: 0, protein: 0, carbs: 0, fats: 0, fiber: 0, sugar: 0, gr: 0 });
       }
       const dayData = dailyMap.get(date);
 
@@ -196,11 +188,11 @@ export const ProgressRepository = {
       value: totalForce > 0 ? Math.round((value / totalForce) * 100) : 0
     })).filter(m => m.value > 0);
 
-    let totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0, totalFiber = 0, totalWater = 0;
+    let totalCalories = 0, totalProtein = 0, totalCarbs = 0, totalFat = 0, totalFiber = 0;
     meals?.forEach(m => {
       const date = m.log_date;
       if (!dailyMap.has(date)) {
-        dailyMap.set(date, { date, workouts: 0, kcal: 0, protein: 0, carbs: 0, fats: 0, fiber: 0, sugar: 0, gr: 0, water: 0 });
+        dailyMap.set(date, { date, workouts: 0, kcal: 0, protein: 0, carbs: 0, fats: 0, fiber: 0, sugar: 0, gr: 0 });
       }
       const dayData = dailyMap.get(date);
 
@@ -227,17 +219,6 @@ export const ProgressRepository = {
         dayData.fiber += fiber;
         dayData.sugar += sugar;
       });
-    });
-
-    // Add water to daily data
-    waterLogs?.forEach(w => {
-        const date = w.log_date;
-        if (!dailyMap.has(date)) {
-            dailyMap.set(date, { date, workouts: 0, kcal: 0, protein: 0, carbs: 0, fats: 0, fiber: 0, sugar: 0, gr: 0, water: 0 });
-        }
-        const dayData = dailyMap.get(date);
-        dayData.water += (w.amount_ml || 0);
-        totalWater += (w.amount_ml || 0);
     });
 
     return {

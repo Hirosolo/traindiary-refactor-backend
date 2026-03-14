@@ -16,7 +16,6 @@ export interface CalculationResult {
   protein_g: number;
   fat_g: number;
   carbs_g: number;
-  hydration_ml: number;
 }
 
 const ACTIVITY_MULTIPLIERS = {
@@ -94,10 +93,6 @@ export const NutritionService = {
     const remaining_kcal = daily_calories - (protein_kcal + fat_kcal);
     const carbs_g = Math.round(Math.max(0, remaining_kcal / 4));
 
-    // 7. Hydration Calculation
-    // Base: 35ml per kg
-    const hydration_ml = Math.round(weight_kg * 35);
-
     return {
       bmr: Math.round(bmr),
       tdee: Math.round(tdee),
@@ -105,7 +100,6 @@ export const NutritionService = {
       protein_g,
       fat_g,
       carbs_g,
-      hydration_ml,
     };
   }
 };
